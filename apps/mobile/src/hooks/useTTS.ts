@@ -6,8 +6,9 @@ export function useTTS() {
   const setAiSpeaking = useStore(state => state.setAiSpeaking);
 
   const speak = useCallback((text: string) => {
-    // Strip sentinel blocks before speaking
     let cleaned = text.replace(/✦ACTION✦.*?✦END✦/gs, '');
+    // Remove emoji (Unicode Emoji_Presentation + component ranges)
+    cleaned = cleaned.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
     if (!cleaned) return;
 
