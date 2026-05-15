@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 
-const API_BASE = 'http://100.64.155.208:3001';
+const API_BASE         = 'http://100.64.155.208:3001';
 const FETCH_TIMEOUT_MS = 20_000;
 
 export function useVoiceInput(onTranscript: (text: string) => void, _speechRef?: any) {
@@ -63,46 +63,44 @@ export function useVoiceInput(onTranscript: (text: string) => void, _speechRef?:
       });
       console.log('[Voice] Base64 length:', audioBase64.length, '— sending to backend');
 
-      // AbortController gives us a hard timeout so "Transcribing…" never hangs
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      // Use XHR instead of fetch — fetch() with large POST bodies + AbortController
+      // is unreliable on Android Hermes ("Network request failed").
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE}/transcribe`);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.timeout = FETCH_TIMEOUT_MS;
 
-      let res: Response;
-      try {
-        res = await fetch(`${API_BASE}/transcribe`, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ audioBase64, mimeType: 'audio/m4a' }),
-          signal:  controller.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
+        xhr.onload = () => {
+          console.log('[Voice] Backend response status:', xhr.status);
+          if (xhr.status < 200 || xhr.status >= 300) {
+            reject(new Error(`Server ${xhr.status}: ${xhr.responseText}`));
+            return;
+          }
+          try {
+            const data = JSON.parse(xhr.responseText);
+            const text = (data.transcript ?? '').trim();
+            console.log('[Voice] Transcript:', JSON.stringify(text));
+            setIsListening(false);
+            setTranscript('');
+            if (text) onTranscriptRef.current(text);
+            else      setError('No speech detected — try again.');
+            resolve();
+          } catch {
+            reject(new Error('Invalid JSON from transcription server'));
+          }
+        };
 
-      console.log('[Voice] Backend response status:', res.status);
+        xhr.onerror   = () => reject(new Error('Cannot reach server — is the API running?'));
+        xhr.ontimeout = () => reject(new Error(`Timed out — is the API server running at ${API_BASE}?`));
 
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        console.error('[Voice] Backend error body:', body);
-        throw new Error(`Server ${res.status}${body ? ': ' + body : ''}`);
-      }
-
-      const data = await res.json();
-      const text = (data.transcript ?? '').trim();
-      console.log('[Voice] Transcript:', JSON.stringify(text));
-
-      setIsListening(false);
-      setTranscript('');
-      if (text) onTranscriptRef.current(text);
-      else      setError('No speech detected — try again.');
+        xhr.send(JSON.stringify({ audioBase64, mimeType: 'audio/m4a' }));
+      });
     } catch (e: any) {
       console.error('[Voice] Transcription error:', e);
       setIsListening(false);
       setTranscript('');
-      const msg = e.name === 'AbortError'
-        ? `Timed out — is the API server running at ${API_BASE}?`
-        : (e.message ?? 'Unknown error');
-      setError('Transcription failed: ' + msg);
+      setError('Transcription failed: ' + (e.message ?? 'Unknown error'));
     }
   }, []);
 

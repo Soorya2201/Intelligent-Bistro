@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import Animated, {
   useAnimatedStyle, withTiming, useSharedValue,
   FadeInDown, withDelay, withRepeat, withSequence,
 } from 'react-native-reanimated';
 import Markdown from 'react-native-markdown-display';
 import { COLORS } from '../../constants/theme';
+import MenuMicroTile from './MenuMicroTile';
+import { SuggestedItem } from '../../types';
 
 interface ChatBubbleProps {
   message: {
@@ -14,6 +16,7 @@ interface ChatBubbleProps {
     content: string;
     timestamp: Date;
     isStreaming?: boolean;
+    suggestedItems?: SuggestedItem[];
   };
 }
 
@@ -72,29 +75,46 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
     ? (cursorVisible ? ' |' : '  ')
     : '');
 
+  const hasTiles = !isUser && !!message.suggestedItems?.length;
+
   return (
     <Animated.View
       entering={FadeInDown.duration(280).springify().damping(18)}
-      style={[styles.row, isUser ? styles.rowUser : styles.rowAi]}
+      style={styles.outerCol}
     >
-      {!isUser && (
-        <View style={styles.avatarAi}>
-          <Text style={styles.avatarTextAi}>B</Text>
-        </View>
-      )}
+      <View style={[styles.row, isUser ? styles.rowUser : styles.rowAi]}>
+        {!isUser && (
+          <View style={styles.avatarAi}>
+            <Text style={styles.avatarTextAi}>B</Text>
+          </View>
+        )}
 
-      <View style={[styles.col, isUser && styles.colUser]}>
-        <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAi]}>
-          {isTyping ? (
-            <TypingDots />
-          ) : isUser ? (
-            <Text style={[styles.text, styles.textUser]}>{content}</Text>
-          ) : (
-            <Markdown style={markdownStyles}>{content}</Markdown>
-          )}
+        <View style={[styles.col, isUser && styles.colUser]}>
+          <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAi]}>
+            {isTyping ? (
+              <TypingDots />
+            ) : isUser ? (
+              <Text style={[styles.text, styles.textUser]}>{content}</Text>
+            ) : (
+              <Markdown style={markdownStyles}>{content}</Markdown>
+            )}
+          </View>
+          <Text style={[styles.time, isUser && styles.timeUser]}>{timeStr}</Text>
         </View>
-        <Text style={[styles.time, isUser && styles.timeUser]}>{timeStr}</Text>
       </View>
+
+      {hasTiles && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tilesScroll}
+          contentContainerStyle={styles.tilesContent}
+        >
+          {message.suggestedItems!.map(item => (
+            <MenuMicroTile key={item.id} item={item} />
+          ))}
+        </ScrollView>
+      )}
     </Animated.View>
   );
 }
@@ -114,12 +134,21 @@ const markdownStyles = {
 };
 
 const styles = StyleSheet.create({
+  outerCol: {
+    marginVertical: 7,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 10,
     paddingHorizontal: 20,
-    marginVertical: 7,
+  },
+  tilesScroll: {
+    marginTop: 8,
+  },
+  tilesContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 2,
   },
   rowUser: { flexDirection: 'row-reverse' },
   rowAi:   {},

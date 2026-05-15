@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { ChatMessage } from '../types';
+import { ChatMessage, SuggestedItem } from '../types';
 
 export interface ChatSlice {
   messages: ChatMessage[];
@@ -9,6 +9,7 @@ export interface ChatSlice {
   isAiSpeaking: boolean;
   addMessage: (msg: ChatMessage) => void;
   appendToLastAssistantMessage: (text: string) => void;
+  setSuggestedItemsOnLastMessage: (items: SuggestedItem[]) => void;
   setStreaming: (isStreaming: boolean) => void;
   setQuickReplies: (options: string[]) => void;
   clearQuickReplies: () => void;
@@ -22,6 +23,15 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (set)
   pendingClarification: false,
   isAiSpeaking: false,
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
+  setSuggestedItemsOnLastMessage: (items) => set((state) => {
+    const messages = [...state.messages];
+    if (messages.length === 0) return state;
+    const last = messages[messages.length - 1];
+    if (last.role === 'assistant') {
+      messages[messages.length - 1] = { ...last, suggestedItems: items };
+    }
+    return { messages };
+  }),
   appendToLastAssistantMessage: (text) => set((state) => {
     const messages = [...state.messages];
     if (messages.length === 0) return state;

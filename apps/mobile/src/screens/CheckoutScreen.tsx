@@ -57,7 +57,7 @@ export default function CheckoutScreen() {
     setIsConfirmed(true);
     setTimeout(() => {
       clearCart();
-      navigation.navigate('Home');
+      navigation.goBack();
     }, 2000);
   };
 

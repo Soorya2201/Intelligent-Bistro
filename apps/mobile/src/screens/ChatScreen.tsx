@@ -138,7 +138,10 @@ export default function ChatScreen() {
     await streamChat(
       currentMessages,
       cartItems,
-      { restrictions: profile.restrictions },
+      {
+        restrictions: profile.restrictions,
+        likedItems: profile.likedItems.map(i => ({ id: i.id, name: i.name, price: i.price })),
+      },
       (chunk) => {
         const { visibleText } = processChunk(chunk);
         if (visibleText) appendToLastAssistantMessage(visibleText);

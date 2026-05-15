@@ -2,16 +2,19 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { FlashList } from '@shopify/flash-list';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MenuCard from './MenuCard';
 import { COLORS } from '../../constants/theme';
 import { MenuItem } from '../../types';
 import menuData from '../../../../api/src/data/menu.json';
 
-const CAT_ICONS: Record<string, string> = {
-  burgers:  '🍔',
-  sides:    '🍟',
-  drinks:   '🥤',
-  desserts: '🍰',
+type MCIcon = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+
+const CAT_ICONS: Record<string, MCIcon> = {
+  burgers:  'hamburger',
+  sides:    'french-fries',
+  drinks:   'cup-water',
+  desserts: 'cupcake',
 };
 
 export default function MenuGrid() {
@@ -39,6 +42,7 @@ export default function MenuGrid() {
       >
         {categories.map(cat => {
           const active = cat.id === activeCategory;
+          const iconName: MCIcon = CAT_ICONS[cat.id] ?? 'silverware-fork-knife';
           return (
             <TouchableOpacity
               key={cat.id}
@@ -46,7 +50,11 @@ export default function MenuGrid() {
               activeOpacity={0.7}
             >
               <View style={[styles.tab, active && styles.tabActive]}>
-                <Text style={styles.tabIcon}>{CAT_ICONS[cat.id] ?? '🍽️'}</Text>
+                <MaterialCommunityIcons
+                  name={iconName}
+                  size={16}
+                  color={active ? '#fff' : COLORS.bistroGold}
+                />
                 <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
                   {cat.name}
                 </Text>
@@ -97,7 +105,7 @@ const styles = StyleSheet.create({
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 24,
@@ -110,7 +118,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bistroBrown,
     borderColor: COLORS.bistroBrown,
   },
-  tabIcon: { fontSize: 14 },
   tabLabel: {
     fontSize: 13,
     fontWeight: '600',

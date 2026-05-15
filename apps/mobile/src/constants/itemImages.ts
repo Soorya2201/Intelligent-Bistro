@@ -1,0 +1,16 @@
+export const ITEM_IMAGES: Record<string, string> = {
+  'classic-burger':     '🍔',
+  'spicy-chicken':      '🌶️',
+  'mushroom-burger':    '🍄',
+  'vegan-burger':       '🌱',
+  'truffle-fries':      '🍟',
+  'sweet-potato-fries': '🍠',
+  'side-salad':         '🥗',
+  'onion-rings':        '🧅',
+  'classic-soda':       '🥤',
+  'lemonade':           '🍋',
+  'iced-tea':           '🍵',
+  'sparkling-water':    '💧',
+  'large-water':        '🫗',
+  'bbq-burger':         '🥩',
+};
