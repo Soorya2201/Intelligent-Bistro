@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { SpeechWebViewRef } from '../components/Chat/SpeechWebView';
 
 export function useVoiceInput(
   onTranscript: (text: string) => void,
-  speechRef?: React.RefObject<SpeechWebViewRef>,
+  speechRef?: React.RefObject<SpeechWebViewRef | null>,
 ) {
   const [isListening, setIsListening] = useState(false);
   const [transcript,  setTranscript]  = useState('');
