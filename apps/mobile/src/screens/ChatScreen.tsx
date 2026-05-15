@@ -113,8 +113,10 @@ export default function ChatScreen() {
       pulseLoopRef.current.start();
     } else {
       pulseLoopRef.current?.stop();
-      pulseOpacity.setValue(0);
-      pulseScale.setValue(1);
+      // stopAnimation callback fires after the native thread fully halts,
+      // preventing the race where setValue is overridden by an in-flight frame.
+      pulseOpacity.stopAnimation(() => pulseOpacity.setValue(0));
+      pulseScale.stopAnimation(() => pulseScale.setValue(1));
     }
   }, [isListening]);
 
