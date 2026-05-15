@@ -1,0 +1,215 @@
+{
+  "categories": [
+    {
+      "id": "burgers",
+      "name": "Burgers",
+      "items": [
+        {
+          "id": "classic-burger",
+          "name": "Classic Bistro Burger",
+          "price": 14.5,
+          "description": "8oz beef patty, lettuce, tomato, bistro sauce",
+          "dietary": [
+            "gluten"
+          ],
+          "pairings": [
+            "truffle-fries",
+            "classic-soda"
+          ],
+          "image": "\ud83c\udf54"
+        },
+        {
+          "id": "spicy-chicken",
+          "name": "Spicy Chicken Sandwich",
+          "price": 13.0,
+          "description": "Crispy chicken, jalape\u00f1os, sriracha mayo",
+          "dietary": [
+            "gluten",
+            "spicy"
+          ],
+          "pairings": [
+            "sweet-potato-fries",
+            "lemonade"
+          ],
+          "image": "\ud83c\udf36\ufe0f"
+        },
+        {
+          "id": "mushroom-burger",
+          "name": "Mushroom Swiss Burger",
+          "price": 15.0,
+          "description": "Portobello mushroom, swiss cheese, garlic aioli",
+          "dietary": [
+            "gluten",
+            "vegetarian"
+          ],
+          "pairings": [
+            "truffle-fries",
+            "iced-tea"
+          ],
+          "image": "\ud83c\udf44"
+        },
+        {
+          "id": "vegan-burger",
+          "name": "Beyond Bistro Burger",
+          "price": 16.0,
+          "description": "Plant-based patty, avocado, vegan mayo",
+          "dietary": [
+            "vegan",
+            "gluten"
+          ],
+          "pairings": [
+            "side-salad",
+            "sparkling-water"
+          ],
+          "image": "\ud83c\udf31"
+        },
+        {
+          "id": "bbq-burger",
+          "name": "Smokehouse BBQ Burger",
+          "price": 16.5,
+          "description": "Smoked beef patty, aged cheddar, crispy onion straws, tangy BBQ sauce",
+          "dietary": [
+            "gluten"
+          ],
+          "pairings": [
+            "truffle-fries",
+            "classic-soda"
+          ],
+          "image": "\ud83e\udd69"
+        }
+      ]
+    },
+    {
+      "id": "sides",
+      "name": "Sides",
+      "items": [
+        {
+          "id": "truffle-fries",
+          "name": "Truffle Fries",
+          "price": 8.5,
+          "description": "Hand-cut fries, truffle oil, parmesan",
+          "dietary": [
+            "vegetarian",
+            "gluten-free"
+          ],
+          "pairings": [],
+          "image": "\ud83c\udf5f"
+        },
+        {
+          "id": "sweet-potato-fries",
+          "name": "Sweet Potato Fries",
+          "price": 7.5,
+          "description": "Crispy sweet potato, chipotle dip",
+          "dietary": [
+            "vegan",
+            "gluten-free"
+          ],
+          "pairings": [],
+          "image": "\ud83c\udf60"
+        },
+        {
+          "id": "side-salad",
+          "name": "Garden Side Salad",
+          "price": 6.0,
+          "description": "Mixed greens, cherry tomato, balsamic",
+          "dietary": [
+            "vegan",
+            "gluten-free"
+          ],
+          "pairings": [],
+          "image": "\ud83e\udd57"
+        },
+        {
+          "id": "onion-rings",
+          "name": "Onion Rings",
+          "price": 7.0,
+          "description": "Beer-battered, smoky ranch dip",
+          "dietary": [
+            "vegetarian",
+            "gluten"
+          ],
+          "pairings": [],
+          "image": "\ud83e\uddc5"
+        },
+        {
+          "id": "cheese-fries",
+          "name": "Loaded Cheese Fries",
+          "price": 9.0,
+          "description": "Crispy fries, melted cheddar sauce, pickled jalape\u00f1os, sour cream",
+          "dietary": [
+            "vegetarian",
+            "gluten"
+          ],
+          "pairings": [],
+          "image": "\ud83e\uddc0"
+        }
+      ]
+    },
+    {
+      "id": "drinks",
+      "name": "Drinks",
+      "items": [
+        {
+          "id": "classic-soda",
+          "name": "Classic Soda",
+          "price": 3.5,
+          "description": "Coke, Diet Coke, Sprite \u2014 your choice",
+          "dietary": [
+            "vegan",
+            "gluten-free"
+          ],
+          "pairings": [],
+          "image": "\ud83e\udd64"
+        },
+        {
+          "id": "lemonade",
+          "name": "Fresh Lemonade",
+          "price": 4.5,
+          "description": "House-squeezed, mint, light ice",
+          "dietary": [
+            "vegan",
+            "gluten-free"
+          ],
+          "pairings": [],
+          "image": "\ud83c\udf4b"
+        },
+        {
+          "id": "iced-tea",
+          "name": "Iced Tea",
+          "price": 3.5,
+          "description": "Brewed black tea, sweetened or unsweetened",
+          "dietary": [
+            "vegan",
+            "gluten-free"
+          ],
+          "pairings": [],
+          "image": "\ud83c\udf75"
+        },
+        {
+          "id": "sparkling-water",
+          "name": "Sparkling Water",
+          "price": 2.5,
+          "description": "San Pellegrino",
+          "dietary": [
+            "vegan",
+            "gluten-free"
+          ],
+          "pairings": [],
+          "image": "\ud83d\udca7"
+        },
+        {
+          "id": "large-water",
+          "name": "Still Water (Large)",
+          "price": 2.0,
+          "description": "Large still water",
+          "dietary": [
+            "vegan",
+            "gluten-free"
+          ],
+          "pairings": [],
+          "image": "\ud83e\uded7"
+        }
+      ]
+    }
+  ]
+}

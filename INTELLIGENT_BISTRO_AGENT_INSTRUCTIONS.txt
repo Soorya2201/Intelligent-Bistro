@@ -1,0 +1,1539 @@
+================================================================================
+  THE INTELLIGENT BISTRO — FULL AGENT BUILD INSTRUCTIONS
+  For: AI Coding Agent (Claude Code / Cursor / Copilot)
+  Version: 1.0
+  Stack: React Native (Expo) + Node.js + Claude Sonnet 4
+================================================================================
+
+READ THIS ENTIRE FILE BEFORE WRITING A SINGLE LINE OF CODE.
+Every decision here is intentional. Do not substitute libraries, skip steps,
+or reorder tasks. Follow the sequence exactly.
+
+================================================================================
+  SECTION 0 — PROJECT OVERVIEW & GOAL
+================================================================================
+
+You are building "The Intelligent Bistro" — a mobile food ordering app where
+users can order food through a conversational AI assistant. The AI understands
+natural language, updates a live shopping cart in real-time while it is still
+streaming a response, supports voice input and voice output, remembers dietary
+preferences, proactively suggests pairings, and handles ambiguous orders with
+interactive quick-reply chips.
+
+This must be production-quality. Every screen must be polished and intentional.
+
+--------------------------------------------------------------------------------
+  KEY TECHNICAL INNOVATIONS (What makes this stand out)
+--------------------------------------------------------------------------------
+
+1. SENTINEL STREAMING: The AI embeds structured JSON inside its natural language
+   response using sentinel delimiters. The frontend parses this mid-stream and
+   updates the cart BEFORE the AI finishes speaking. This creates the illusion
+   that the cart is alive and reacting to the AI's voice in real time.
+
+2. JARVIS DOT CLUSTER: A custom CSS animation — a cluster of warm-colored dots
+   that pulse, orbit, and breathe while the AI is speaking. No libraries.
+   Pure CSS keyframes. This is the visual identity of the AI assistant.
+
+3. VOICE-FIRST: Tap to talk, AI transcribes via native STT, responds in natural
+   language, speaks the response back via TTS. The cart animates the whole time.
+
+4. DIETARY MEMORY: The AI remembers "I'm vegan" across the session and
+   auto-warns on conflicting items.
+
+5. AMBIGUITY CHIPS: When the AI is unsure, it renders interactive quick-reply
+   buttons (not just text) so the user taps to clarify.
+
+================================================================================
+  SECTION 1 — REPOSITORY STRUCTURE
+================================================================================
+
+Create this exact folder structure. Do not deviate.
+
+intelligent-bistro/
+├── README.md
+├── package.json                    (root — Turborepo config)
+├── turbo.json
+├── .gitignore
+│
+├── apps/
+│   ├── mobile/                     (Expo React Native app)
+│   │   ├── app.json
+│   │   ├── babel.config.js
+│   │   ├── tailwind.config.js
+│   │   ├── package.json
+│   │   ├── assets/
+│   │   │   └── fonts/
+│   │   └── src/
+│   │       ├── components/
+│   │       │   ├── Chat/
+│   │       │   │   ├── ChatBubble.tsx
+│   │       │   │   ├── ChatInput.tsx
+│   │       │   │   ├── ChatList.tsx
+│   │       │   │   ├── QuickReplyChips.tsx
+│   │       │   │   └── TypingIndicator.tsx
+│   │       │   ├── JarvisDots/
+│   │       │   │   └── JarvisDots.tsx    ← THE ANIMATED DOT CLUSTER
+│   │       │   ├── Cart/
+│   │       │   │   ├── CartSheet.tsx
+│   │       │   │   ├── CartItem.tsx
+│   │       │   │   └── CartBadge.tsx
+│   │       │   ├── Menu/
+│   │       │   │   ├── MenuGrid.tsx
+│   │       │   │   ├── MenuCard.tsx
+│   │       │   │   └── DietaryBadge.tsx
+│   │       │   ├── Voice/
+│   │       │   │   └── VoiceButton.tsx
+│   │       │   └── Checkout/
+│   │       │       └── OrderRecap.tsx
+│   │       ├── screens/
+│   │       │   ├── HomeScreen.tsx
+│   │       │   ├── ChatScreen.tsx
+│   │       │   └── CheckoutScreen.tsx
+│   │       ├── store/
+│   │       │   ├── index.ts
+│   │       │   ├── cartSlice.ts
+│   │       │   ├── chatSlice.ts
+│   │       │   └── profileSlice.ts
+│   │       ├── hooks/
+│   │       │   ├── useStreamParser.ts
+│   │       │   ├── useVoiceInput.ts
+│   │       │   └── useTTS.ts
+│   │       ├── services/
+│   │       │   └── api.ts
+│   │       ├── constants/
+│   │       │   └── theme.ts
+│   │       └── types/
+│   │           └── index.ts
+│   │
+│   └── api/                        (Node.js + Express backend)
+│       ├── package.json
+│       ├── tsconfig.json
+│       └── src/
+│           ├── index.ts
+│           ├── routes/
+│           │   ├── chat.ts
+│           │   └── menu.ts
+│           ├── services/
+│           │   └── anthropic.ts
+│           └── data/
+│               └── menu.json
+
+================================================================================
+  SECTION 2 — SETUP & DEPENDENCIES
+================================================================================
+
+--------------------------------------------------------------------------------
+  ROOT (Turborepo)
+--------------------------------------------------------------------------------
+
+File: package.json (root)
+{
+  "name": "intelligent-bistro",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build"
+  },
+  "devDependencies": {
+    "turbo": "latest"
+  }
+}
+
+File: turbo.json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "pipeline": {
+    "dev": { "cache": false, "persistent": true },
+    "build": { "outputs": ["dist/**"] }
+  }
+}
+
+--------------------------------------------------------------------------------
+  MOBILE APP DEPENDENCIES
+--------------------------------------------------------------------------------
+
+Run inside apps/mobile/:
+  npx create-expo-app . --template blank-typescript
+
+Then install:
+  npx expo install expo-speech-recognition expo-speech expo-av expo-haptics
+  npm install zustand
+  npm install react-native-reanimated
+  npm install nativewind
+  npm install tailwindcss --save-dev
+  npm install @shopify/flash-list
+  npm install react-native-safe-area-context react-native-screens
+  npm install @react-navigation/native @react-navigation/bottom-tabs
+  npm install react-native-gesture-handler
+
+File: babel.config.js
+  module.exports = function(api) {
+    api.cache(true);
+    return {
+      presets: ['babel-preset-expo'],
+      plugins: [
+        'nativewind/babel',
+        'react-native-reanimated/plugin'  // MUST be last
+      ]
+    };
+  };
+
+File: tailwind.config.js
+  module.exports = {
+    content: ['./src/**/*.{js,jsx,ts,tsx}'],
+    theme: {
+      extend: {
+        colors: {
+          bistro: {
+            cream: '#F5F0E8',
+            brown: '#3D2B1F',
+            gold: '#C9933A',
+            warm: '#E8D5B7',
+            accent: '#8B4513'
+          }
+        }
+      }
+    },
+    plugins: []
+  };
+
+--------------------------------------------------------------------------------
+  BACKEND DEPENDENCIES
+--------------------------------------------------------------------------------
+
+Run inside apps/api/:
+  npm init -y
+  npm install express cors @anthropic-ai/sdk dotenv
+  npm install -D typescript @types/express @types/node ts-node nodemon
+
+File: apps/api/tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true
+  }
+}
+
+================================================================================
+  SECTION 3 — THE MENU DATA
+================================================================================
+
+File: apps/api/src/data/menu.json
+
+This is the single source of truth. The backend serves this. The AI receives
+this as context in every request.
+
+{
+  "categories": [
+    {
+      "id": "burgers",
+      "name": "Burgers",
+      "items": [
+        {
+          "id": "classic-burger",
+          "name": "Classic Bistro Burger",
+          "price": 14.50,
+          "description": "8oz beef patty, lettuce, tomato, bistro sauce",
+          "dietary": ["gluten"],
+          "pairings": ["truffle-fries", "classic-soda"],
+          "image": "🍔"
+        },
+        {
+          "id": "spicy-chicken",
+          "name": "Spicy Chicken Sandwich",
+          "price": 13.00,
+          "description": "Crispy chicken, jalapeños, sriracha mayo",
+          "dietary": ["gluten", "spicy"],
+          "pairings": ["sweet-potato-fries", "lemonade"],
+          "image": "🌶️"
+        },
+        {
+          "id": "mushroom-burger",
+          "name": "Mushroom Swiss Burger",
+          "price": 15.00,
+          "description": "Portobello mushroom, swiss cheese, garlic aioli",
+          "dietary": ["gluten", "vegetarian"],
+          "pairings": ["truffle-fries", "iced-tea"],
+          "image": "🍄"
+        },
+        {
+          "id": "vegan-burger",
+          "name": "Beyond Bistro Burger",
+          "price": 16.00,
+          "description": "Plant-based patty, avocado, vegan mayo",
+          "dietary": ["vegan", "gluten"],
+          "pairings": ["side-salad", "sparkling-water"],
+          "image": "🌱"
+        }
+      ]
+    },
+    {
+      "id": "sides",
+      "name": "Sides",
+      "items": [
+        {
+          "id": "truffle-fries",
+          "name": "Truffle Fries",
+          "price": 8.50,
+          "description": "Hand-cut fries, truffle oil, parmesan",
+          "dietary": ["vegetarian", "gluten-free"],
+          "pairings": [],
+          "image": "🍟"
+        },
+        {
+          "id": "sweet-potato-fries",
+          "name": "Sweet Potato Fries",
+          "price": 7.50,
+          "description": "Crispy sweet potato, chipotle dip",
+          "dietary": ["vegan", "gluten-free"],
+          "pairings": [],
+          "image": "🍠"
+        },
+        {
+          "id": "side-salad",
+          "name": "Garden Side Salad",
+          "price": 6.00,
+          "description": "Mixed greens, cherry tomato, balsamic",
+          "dietary": ["vegan", "gluten-free"],
+          "pairings": [],
+          "image": "🥗"
+        },
+        {
+          "id": "onion-rings",
+          "name": "Onion Rings",
+          "price": 7.00,
+          "description": "Beer-battered, smoky ranch dip",
+          "dietary": ["vegetarian", "gluten"],
+          "pairings": [],
+          "image": "🧅"
+        }
+      ]
+    },
+    {
+      "id": "drinks",
+      "name": "Drinks",
+      "items": [
+        {
+          "id": "classic-soda",
+          "name": "Classic Soda",
+          "price": 3.50,
+          "description": "Coke, Diet Coke, Sprite — your choice",
+          "dietary": ["vegan", "gluten-free"],
+          "pairings": [],
+          "image": "🥤"
+        },
+        {
+          "id": "lemonade",
+          "name": "Fresh Lemonade",
+          "price": 4.50,
+          "description": "House-squeezed, mint, light ice",
+          "dietary": ["vegan", "gluten-free"],
+          "pairings": [],
+          "image": "🍋"
+        },
+        {
+          "id": "iced-tea",
+          "name": "Iced Tea",
+          "price": 3.50,
+          "description": "Brewed black tea, sweetened or unsweetened",
+          "dietary": ["vegan", "gluten-free"],
+          "pairings": [],
+          "image": "🍵"
+        },
+        {
+          "id": "sparkling-water",
+          "name": "Sparkling Water",
+          "price": 2.50,
+          "description": "San Pellegrino",
+          "dietary": ["vegan", "gluten-free"],
+          "pairings": [],
+          "image": "💧"
+        },
+        {
+          "id": "large-water",
+          "name": "Still Water (Large)",
+          "price": 2.00,
+          "description": "Large still water",
+          "dietary": ["vegan", "gluten-free"],
+          "pairings": [],
+          "image": "🫗"
+        }
+      ]
+    }
+  ]
+}
+
+================================================================================
+  SECTION 4 — TYPE DEFINITIONS
+================================================================================
+
+File: apps/mobile/src/types/index.ts
+
+export interface MenuItem {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  dietary: string[];
+  pairings: string[];
+  image: string;
+  category?: string;
+}
+
+export interface CartItem {
+  menuItem: MenuItem;
+  quantity: number;
+  specialInstructions?: string;
+}
+
+export interface Cart {
+  items: CartItem[];
+  total: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  isStreaming?: boolean;
+}
+
+export interface UserProfile {
+  restrictions: string[];     // e.g. ['vegan', 'no nuts', 'gluten-free']
+  name?: string;
+}
+
+// ACTION TYPES — parsed from the sentinel stream
+export type ActionOp = 'add' | 'remove' | 'update' | 'clear' | 'upsell' | 'clarify';
+
+export interface CartAction {
+  op: ActionOp;
+  items?: Array<{
+    id: string;
+    name: string;
+    qty: number;
+    price: number;
+    specialInstructions?: string;
+  }>;
+  question?: string;        // for clarify op
+  options?: string[];       // for clarify op
+  upsellItem?: string;      // for upsell op
+  upsellMessage?: string;
+}
+
+export interface StreamChunk {
+  type: 'text' | 'action' | 'done';
+  text?: string;
+  action?: CartAction;
+}
+
+================================================================================
+  SECTION 5 — ZUSTAND STORE
+================================================================================
+
+File: apps/mobile/src/store/cartSlice.ts
+
+PSEUDOCODE:
+  State:
+    items: CartItem[]          ← array of { menuItem, quantity }
+    isAnimating: boolean       ← triggers cart animation
+
+  Actions:
+    addItem(menuItem, qty):
+      find existing CartItem with menuItem.id
+      if found → increment quantity
+      if not found → push new CartItem
+      set isAnimating = true, then false after 600ms
+
+    removeItem(menuItemId):
+      filter out item with matching id
+      animate
+
+    updateQuantity(menuItemId, qty):
+      if qty <= 0 → removeItem
+      else → set quantity to qty
+      animate
+
+    clearCart():
+      items = []
+
+    getTotal():
+      return items.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0)
+
+    getItemCount():
+      return items.reduce((sum, item) => sum + item.quantity, 0)
+
+IMPLEMENTATION:
+  import { create } from 'zustand';
+
+  Use Zustand's create() with an object containing:
+  - items array
+  - all the action functions above
+  - computed getters for total and itemCount
+
+File: apps/mobile/src/store/chatSlice.ts
+
+  State:
+    messages: ChatMessage[]
+    isStreaming: boolean
+    quickReplies: string[]     ← populated when AI sends a clarify action
+    pendingClarification: boolean
+
+  Actions:
+    addMessage(msg)
+    appendToLastAssistantMessage(text)   ← used during streaming
+    setStreaming(bool)
+    setQuickReplies(options: string[])
+    clearQuickReplies()
+
+File: apps/mobile/src/store/profileSlice.ts
+
+  State:
+    restrictions: string[]    ← dietary preferences remembered across session
+
+  Actions:
+    addRestriction(restriction: string)
+    removeRestriction(restriction: string)
+    clearRestrictions()
+
+File: apps/mobile/src/store/index.ts
+
+  Combine all slices:
+
+  import { create } from 'zustand';
+  import { CartSlice, createCartSlice } from './cartSlice';
+  import { ChatSlice, createChatSlice } from './chatSlice';
+  import { ProfileSlice, createProfileSlice } from './profileSlice';
+
+  export const useStore = create<CartSlice & ChatSlice & ProfileSlice>()(
+    (...args) => ({
+      ...createCartSlice(...args),
+      ...createChatSlice(...args),
+      ...createProfileSlice(...args),
+    })
+  );
+
+================================================================================
+  SECTION 6 — THE SENTINEL STREAM PARSER (CRITICAL)
+================================================================================
+
+This is the most important piece of the frontend. Study it carefully.
+
+--------------------------------------------------------------------------------
+  HOW SENTINELS WORK
+--------------------------------------------------------------------------------
+
+The AI backend instructs Claude to respond like this:
+
+  "I've added that for you! ✦ACTION✦{"op":"add","items":[{"id":"truffle-fries",
+  "name":"Truffle Fries","qty":1,"price":8.50}]}✦END✦ Would you like anything
+  else?"
+
+The frontend receives this as a stream of text chunks (Server-Sent Events).
+As each chunk arrives, we accumulate it into a buffer.
+
+The parser runs on every new chunk and:
+  1. Looks for the opening sentinel: ✦ACTION✦
+  2. Once found, begins buffering the JSON
+  3. When it finds ✦END✦, extracts the JSON, parses it, and dispatches the action
+  4. Strips the entire sentinel block from the visible chat text
+  5. Only clean natural language appears in the chat bubble
+
+--------------------------------------------------------------------------------
+  FILE: apps/mobile/src/hooks/useStreamParser.ts
+--------------------------------------------------------------------------------
+
+SENTINEL CONSTANTS (define at the top of the file):
+  const SENTINEL_OPEN = '✦ACTION✦';
+  const SENTINEL_CLOSE = '✦END✦';
+
+STATE (use useRef for these, not useState, to avoid re-render on each chunk):
+  bufferRef: string          ← accumulates raw text from the stream
+  insideActionRef: boolean   ← are we currently inside a sentinel block?
+  actionBufferRef: string    ← accumulates JSON characters
+
+FUNCTION: parseChunk(rawChunk: string): { visibleText: string, actions: CartAction[] }
+
+  PSEUDOCODE:
+    visibleText = ''
+    actions = []
+
+    for each character c in rawChunk:
+      if not insideAction:
+        append c to buffer
+        if buffer ends with SENTINEL_OPEN:
+          insideAction = true
+          actionBuffer = ''
+          // Remove the sentinel open from visibleText
+          visibleText = visibleText.slice(0, visibleText.length - SENTINEL_OPEN.length + 1)
+          // Actually: strip it from the end of accumulated visible output
+        else:
+          visibleText += c
+      else:
+        actionBuffer += c
+        if actionBuffer ends with SENTINEL_CLOSE:
+          jsonStr = actionBuffer.slice(0, -SENTINEL_CLOSE.length)
+          try:
+            action = JSON.parse(jsonStr)
+            actions.push(action)
+          catch:
+            // malformed JSON — log but don't crash
+          insideAction = false
+          actionBuffer = ''
+          // Do NOT add anything to visibleText — sentinel is invisible
+
+    return { visibleText, actions }
+
+IMPORTANT IMPLEMENTATION NOTE:
+  The character-by-character approach above is the most reliable. An alternative
+  is string indexOf() checking after each append, but char-by-char is cleaner.
+
+HOOK RETURN VALUE:
+  return {
+    processChunk: (rawChunk) => { ... },    ← call this on each SSE chunk
+    reset: () => { ... }                     ← call before each new message
+  }
+
+WHEN AN ACTION IS RECEIVED:
+  Immediately call the appropriate store action:
+  - op === 'add'     → store.addItem(...)
+  - op === 'remove'  → store.removeItem(...)
+  - op === 'update'  → store.updateQuantity(...)
+  - op === 'clear'   → store.clearCart()
+  - op === 'clarify' → store.setQuickReplies(action.options)
+  - op === 'upsell'  → show a special chat bubble (handled in chat UI)
+
+================================================================================
+  SECTION 7 — BACKEND: NODE.JS API
+================================================================================
+
+File: apps/api/src/index.ts
+
+  import express from 'express';
+  import cors from 'cors';
+  import chatRouter from './routes/chat';
+  import menuRouter from './routes/menu';
+
+  const app = express();
+  app.use(cors());
+  app.use(express.json());
+  app.use('/chat', chatRouter);
+  app.use('/menu', menuRouter);
+  app.listen(3001, () => console.log('Bistro API running on port 3001'));
+
+--------------------------------------------------------------------------------
+  File: apps/api/src/routes/menu.ts
+--------------------------------------------------------------------------------
+
+  import { Router } from 'express';
+  import menu from '../data/menu.json';
+
+  const router = Router();
+
+  router.get('/', (req, res) => {
+    res.json(menu);
+  });
+
+  export default router;
+
+--------------------------------------------------------------------------------
+  File: apps/api/src/routes/chat.ts
+--------------------------------------------------------------------------------
+
+  This is the main endpoint. It must use Server-Sent Events (SSE).
+
+  import { Router } from 'express';
+  import { streamChatResponse } from '../services/anthropic';
+  import menu from '../data/menu.json';
+
+  const router = Router();
+
+  ENDPOINT: POST /chat
+
+  Request body shape:
+  {
+    messages: Array<{ role: 'user'|'assistant', content: string }>,
+    cart: CartItem[],
+    profile: UserProfile
+  }
+
+  PSEUDOCODE:
+
+  router.post('/', async (req, res) => {
+    // 1. Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    // 2. Extract request body
+    const { messages, cart, profile } = req.body;
+
+    // 3. Build system prompt (see Section 8)
+    const systemPrompt = buildSystemPrompt(cart, profile, menu);
+
+    // 4. Stream from Anthropic SDK
+    const stream = await anthropicClient.messages.stream({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: messages
+    });
+
+    // 5. Forward each chunk as SSE
+    for await (const chunk of stream) {
+      if (chunk.type === 'content_block_delta' &&
+          chunk.delta.type === 'text_delta') {
+        const text = chunk.delta.text;
+        res.write(`data: ${JSON.stringify({ text })}\n\n`);
+      }
+    }
+
+    // 6. Signal completion
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
+  });
+
+  export default router;
+
+--------------------------------------------------------------------------------
+  File: apps/api/src/services/anthropic.ts
+--------------------------------------------------------------------------------
+
+  import Anthropic from '@anthropic-ai/sdk';
+
+  export const anthropicClient = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY
+  });
+
+  FUNCTION: buildSystemPrompt(cart, profile, menu)
+
+  Returns a string. Build it like this (exact template):
+
+  ----------------------------- START OF PROMPT --------------------------------
+
+  You are Bistro, a warm, witty, and helpful AI ordering assistant for The
+  Intelligent Bistro restaurant. You have a friendly, slightly playful tone —
+  like a knowledgeable waiter who genuinely wants you to have a great meal.
+
+  === MENU ===
+  [INSERT JSON.stringify(menu, null, 2) HERE]
+
+  === CURRENT CART ===
+  [INSERT JSON.stringify(cart) HERE — if empty, say "The cart is currently empty."]
+
+  === USER DIETARY PROFILE ===
+  Restrictions remembered this session: [INSERT profile.restrictions.join(', ') or "None stated"]
+  IMPORTANT: If the user orders something that conflicts with their stated
+  restrictions, warn them BEFORE adding it. Say "Hey, just so you know, that
+  contains [X] — want me to add it anyway?"
+
+  === HOW TO RESPOND ===
+
+  1. Respond conversationally in 1-2 natural sentences BEFORE the action block.
+  2. When modifying the cart, embed EXACTLY ONE action block using this format:
+
+     ✦ACTION✦{"op":"...","items":[...]}✦END✦
+
+  3. The action block must be valid JSON. Never put line breaks inside it.
+  4. After the action block, you may add 1 more sentence (e.g. a pairing suggestion).
+  5. If you need to clarify (user said "chicken sandwich" but there are 2 options),
+     use op:"clarify" with a question and options array. Do not add to cart until
+     clarified.
+  6. After any "add" action, include a natural upsell using op:"upsell" in a
+     SECOND action block if there is a relevant pairing. Keep the upsell light
+     — "You got the burger — most customers grab the truffle fries with it!"
+  7. If the user says something like "I'm vegan" or "no nuts", acknowledge it
+     warmly. You do NOT need to emit an action block for dietary preferences —
+     the frontend handles storing them separately.
+  8. For the recap before checkout (when user says "checkout" or "place order"),
+     narrate the entire order naturally before confirming.
+
+  === ACTION SCHEMA ===
+
+  ADD items to cart:
+  ✦ACTION✦{"op":"add","items":[{"id":"ITEM_ID","name":"DISPLAY_NAME","qty":NUMBER,"price":PRICE}]}✦END✦
+
+  REMOVE items from cart:
+  ✦ACTION✦{"op":"remove","items":[{"id":"ITEM_ID","name":"DISPLAY_NAME","qty":0,"price":0}]}✦END✦
+
+  UPDATE quantity:
+  ✦ACTION✦{"op":"update","items":[{"id":"ITEM_ID","name":"DISPLAY_NAME","qty":NEW_QTY,"price":PRICE}]}✦END✦
+
+  CLEAR entire cart:
+  ✦ACTION✦{"op":"clear"}✦END✦
+
+  CLARIFY ambiguous order:
+  ✦ACTION✦{"op":"clarify","question":"Did you mean the Spicy Chicken or Classic Bistro Burger?","options":["Spicy Chicken Sandwich","Classic Bistro Burger"]}✦END✦
+
+  UPSELL a pairing:
+  ✦ACTION✦{"op":"upsell","upsellItem":"truffle-fries","upsellMessage":"Want the truffle fries that most customers pair with it?"}✦END✦
+
+  === RULES ===
+  - NEVER invent menu items that are not in the menu above.
+  - NEVER output the sentinel markers inside a JSON string value.
+  - ALWAYS use the exact item "id" field from the menu, not a guessed ID.
+  - Keep responses SHORT. Under 3 sentences total (excluding the action block).
+  - The user should feel like they are texting a smart, friendly waiter.
+
+  ----------------------------- END OF PROMPT ----------------------------------
+
+================================================================================
+  SECTION 8 — FRONTEND: API SERVICE
+================================================================================
+
+File: apps/mobile/src/services/api.ts
+
+  const API_BASE = 'http://localhost:3001';  // Change to your IP for device testing
+
+  FUNCTION: streamChat(messages, cart, profile, onChunk, onDone, onError)
+
+    PSEUDOCODE:
+      response = await fetch(`${API_BASE}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, cart, profile })
+      })
+
+      reader = response.body.getReader()
+      decoder = new TextDecoder()
+
+      loop:
+        { done, value } = await reader.read()
+        if done: break
+
+        text = decoder.decode(value)
+
+        // SSE format: each event is "data: {...}\n\n"
+        // Split by \n\n to get individual events
+        events = text.split('\n\n').filter(Boolean)
+
+        for each event:
+          if event starts with 'data: ':
+            jsonStr = event.slice('data: '.length)
+            parsed = JSON.parse(jsonStr)
+            if parsed.done:
+              onDone()
+              return
+            if parsed.text:
+              onChunk(parsed.text)
+
+  FUNCTION: fetchMenu()
+    return fetch(`${API_BASE}/menu`).then(r => r.json())
+
+================================================================================
+  SECTION 9 — VOICE INPUT HOOK
+================================================================================
+
+File: apps/mobile/src/hooks/useVoiceInput.ts
+
+  LIBRARIES: expo-speech-recognition
+
+  STATE:
+    isListening: boolean
+    transcript: string
+    error: string | null
+
+  PSEUDOCODE:
+
+  import * as SpeechRecognition from 'expo-speech-recognition';
+
+  function useVoiceInput(onTranscript: (text: string) => void) {
+
+    const startListening = async () => {
+      const { status } = await SpeechRecognition.requestPermissionsAsync();
+      if (status !== 'granted') return;
+
+      SpeechRecognition.start({
+        lang: 'en-US',
+        interimResults: true,     // show words as they come in
+        continuous: false,
+        onResult: (result) => {
+          setTranscript(result.results[0].transcript);
+          if (result.isFinal) {
+            onTranscript(result.results[0].transcript);
+            stopListening();
+          }
+        },
+        onError: (e) => setError(e.message)
+      });
+
+      setIsListening(true);
+    };
+
+    const stopListening = async () => {
+      await SpeechRecognition.stop();
+      setIsListening(false);
+    };
+
+    return { isListening, transcript, startListening, stopListening, error };
+  }
+
+================================================================================
+  SECTION 10 — TTS HOOK
+================================================================================
+
+File: apps/mobile/src/hooks/useTTS.ts
+
+  LIBRARY: expo-speech
+
+  FUNCTION: speak(text: string)
+
+    PSEUDOCODE:
+      // Strip all sentinel blocks before speaking
+      cleaned = text.replace(/✦ACTION✦.*?✦END✦/gs, '')
+      // Trim extra spaces
+      cleaned = cleaned.replace(/\s+/g, ' ').trim()
+
+      import * as Speech from 'expo-speech';
+
+      Speech.speak(cleaned, {
+        language: 'en-US',
+        pitch: 1.0,
+        rate: 0.95,         // slightly slower than default — sounds more natural
+        onStart: () => store.setAiSpeaking(true),
+        onDone: () => store.setAiSpeaking(false),
+        onError: () => store.setAiSpeaking(false)
+      });
+
+  FUNCTION: stop()
+    Speech.stop();
+    store.setAiSpeaking(false);
+
+  NOTE: isAiSpeaking in the store controls the JarvisDots animation.
+  When true → dots animate. When false → dots go idle.
+
+================================================================================
+  SECTION 11 — THE JARVIS DOT CLUSTER ANIMATION
+================================================================================
+
+This component is the visual heart of the AI assistant. It must feel alive.
+Use ONLY CSS animations and React Native's Animated API (or react-native-reanimated).
+No external libraries for the dots themselves.
+
+--------------------------------------------------------------------------------
+  DESIGN SPEC
+--------------------------------------------------------------------------------
+
+  IDLE STATE: 7 dots arranged in a loose cluster. They gently breathe (scale
+  pulses slowly). Very subtle. Like a sleeping creature.
+
+  ACTIVE/SPEAKING STATE: The dots orbit, scatter, and reform. Some move fast,
+  some slow. Colors shift from warm amber to bright gold. The cluster "breathes"
+  and "thinks." This should feel like JARVIS from Iron Man — warm, intelligent,
+  alive.
+
+  COLOR PALETTE (warm, gold, amber tones):
+    Primary dot: #F5A623 (warm amber)
+    Secondary:   #F7C06B (light gold)
+    Accent:      #E8821A (deep orange)
+    Highlight:   #FFF3CD (pale cream)
+    Core:        #C9933A (bistro gold)
+
+--------------------------------------------------------------------------------
+  File: apps/mobile/src/components/JarvisDots/JarvisDots.tsx
+--------------------------------------------------------------------------------
+
+  Props:
+    isActive: boolean     ← true when AI is speaking/streaming
+    size?: number         ← container size, default 120
+
+  IMPLEMENTATION APPROACH: Use react-native-reanimated withRepeat + withSequence
+  for smooth 60fps animations.
+
+  DOT CONFIGURATION (define as constants):
+
+  const DOT_CONFIGS = [
+    // { id, baseX, baseY, size, color, orbitRadius, orbitSpeed, phaseOffset }
+    { id: 0, baseX: 0,    baseY: 0,    size: 14, color: '#F5A623', orbitRadius: 0,  orbitSpeed: 0,    phaseOffset: 0 },    // center dot
+    { id: 1, baseX: -22,  baseY: -18,  size: 8,  color: '#F7C06B', orbitRadius: 28, orbitSpeed: 2200, phaseOffset: 0 },
+    { id: 2, baseX: 24,   baseY: -12,  size: 10, color: '#E8821A', orbitRadius: 32, orbitSpeed: 2800, phaseOffset: 0.8 },
+    { id: 3, baseX: -8,   baseY: 26,   size: 7,  color: '#F7C06B', orbitRadius: 30, orbitSpeed: 2500, phaseOffset: 1.6 },
+    { id: 4, baseX: 28,   baseY: 16,   size: 6,  color: '#C9933A', orbitRadius: 36, orbitSpeed: 3200, phaseOffset: 2.4 },
+    { id: 5, baseX: -26,  baseY: 10,   size: 9,  color: '#F5A623', orbitRadius: 26, orbitSpeed: 1900, phaseOffset: 3.2 },
+    { id: 6, baseX: 6,    baseY: -28,  size: 5,  color: '#FFF3CD', orbitRadius: 22, orbitSpeed: 2100, phaseOffset: 4.0 },
+  ];
+
+  ANIMATION LOGIC:
+
+  For IDLE state (isActive = false):
+    Each dot runs a gentle "breathe" animation:
+    - Scale: withRepeat(withSequence(
+        withTiming(1.15, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0.9, { duration: 1800, easing: Easing.inOut(Easing.sin) })
+      ), -1, true)
+    - stagger the start by phaseOffset * 300ms using withDelay
+    - No position change
+
+  For ACTIVE state (isActive = true):
+    Each non-center dot orbits its center:
+    - Compute x = baseX + orbitRadius * Math.cos(angle)
+    - Compute y = baseY + orbitRadius * Math.sin(angle)
+    - Use a continuous rotation animation where angle goes from 0 to 2π
+
+    IMPORTANT: React Native Animated does not easily do circular orbits.
+    Use this trick:
+      - translateX animated from -orbitRadius to +orbitRadius with a withRepeat
+      - translateY uses a DIFFERENT duration (slightly offset) to create an
+        elliptical/orbital feel
+      OR
+      - Use a JavaScript-driven animation with useEffect + setInterval updating
+        angle every 16ms (60fps) and setting animated values.
+
+    SIMPLEST RELIABLE APPROACH FOR CIRCULAR ORBIT:
+      const angle = useSharedValue(dot.phaseOffset);
+
+      useEffect(() => {
+        if (isActive) {
+          angle.value = withRepeat(
+            withTiming(dot.phaseOffset + Math.PI * 2, {
+              duration: dot.orbitSpeed,
+              easing: Easing.linear
+            }),
+            -1,
+            false
+          );
+        } else {
+          // Return to base position
+          angle.value = withTiming(dot.phaseOffset, { duration: 600 });
+        }
+      }, [isActive]);
+
+      const animatedStyle = useAnimatedStyle(() => ({
+        transform: [
+          { translateX: dot.baseX + dot.orbitRadius * Math.cos(angle.value) },
+          { translateY: dot.baseY + dot.orbitRadius * Math.sin(angle.value) }
+        ]
+      }));
+
+    CENTER DOT (id: 0) during ACTIVE:
+      - Scale pulses between 1.0 and 1.4 rapidly (every 400ms)
+      - Opacity flickers subtly between 0.85 and 1.0
+      - No position change
+
+  GLOW EFFECT (simulate with shadow):
+    For each dot in active state:
+      shadowColor: dot.color
+      shadowOffset: { width: 0, height: 0 }
+      shadowOpacity: 0.8
+      shadowRadius: 8
+    This is not available on Android. For Android, render a slightly larger
+    circle behind the dot at 30% opacity as a "glow" layer.
+
+  CONTAINER:
+    - Width and height: size prop (default 120)
+    - All dots use position: 'absolute'
+    - Center the container: { alignItems: 'center', justifyContent: 'center' }
+    - Each dot is positioned relative to the container center
+    - So center dot is at { left: size/2 - dotSize/2, top: size/2 - dotSize/2 }
+    - Other dots offset from center by their baseX/baseY
+
+  COMPONENT JSX STRUCTURE:
+    <View style={containerStyle}>
+      {DOT_CONFIGS.map(dot => (
+        <Animated.View
+          key={dot.id}
+          style={[dotStyle(dot), animatedStyles[dot.id]]}
+        />
+      ))}
+    </View>
+
+================================================================================
+  SECTION 12 — CHAT SCREEN (The Main Screen)
+================================================================================
+
+File: apps/mobile/src/screens/ChatScreen.tsx
+
+This is the most important screen. It must feel cohesive.
+
+LAYOUT (top to bottom):
+  1. Header bar (restaurant name + cart button with item count badge)
+  2. JarvisDots component (centered, displayed when AI is active OR always visible)
+  3. Chat message list (FlashList for performance)
+  4. Quick reply chips (renders only when quickReplies array is non-empty)
+  5. Voice button + text input bar at the bottom
+
+STREAMING FLOW (step by step, implement exactly this):
+
+  When user sends a message:
+  1. Add user message to chat store
+  2. Add an empty assistant message to chat store with isStreaming: true
+  3. Call store.setStreaming(true)
+  4. Reset the stream parser
+  5. Call api.streamChat(...)
+  6. On each chunk received:
+     a. Call parseChunk(chunk) → gets { visibleText, actions }
+     b. Call store.appendToLastAssistantMessage(visibleText)
+     c. For each action in actions:
+        - Apply to cart (addItem, removeItem, etc.)
+        - Trigger haptic feedback: Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        - If action.op === 'clarify': store.setQuickReplies(action.options)
+  7. On done:
+     a. store.setStreaming(false)
+     b. Mark last message isStreaming: false
+     c. Speak the full assistant message via TTS (strip sentinels first)
+  8. Scroll chat list to bottom after each update
+
+DIETARY DETECTION (frontend side):
+  When user sends a message, scan it for dietary keywords:
+  KEYWORDS: ['vegan', 'vegetarian', 'gluten-free', 'no nuts', 'nut allergy',
+             'dairy-free', 'lactose', 'kosher', 'halal']
+  If a keyword is found:
+    store.addRestriction(keyword)
+  (The AI also handles this in its response, but we store it proactively)
+
+File: apps/mobile/src/components/Chat/ChatBubble.tsx
+
+  Props: message: ChatMessage
+
+  USER bubble:
+    - Right-aligned
+    - Background: bistro brown (#3D2B1F)
+    - Text: white
+    - Border radius: 16px, bottom-right: 4px (classic chat style)
+
+  ASSISTANT bubble:
+    - Left-aligned
+    - Background: bistro cream (#F5F0E8)
+    - Text: dark brown
+    - Border radius: 16px, bottom-left: 4px
+    - If isStreaming: show a subtle blinking cursor at the end of text (| character
+      that fades in/out every 500ms)
+    - Left side: small bistro logo dot in gold
+
+File: apps/mobile/src/components/Chat/QuickReplyChips.tsx
+
+  Renders horizontal ScrollView of tappable chips.
+  Only visible when store.quickReplies.length > 0.
+
+  Each chip:
+    - Rounded pill: border-radius 20, padding 8px 16px
+    - Border: 1.5px solid bistro gold (#C9933A)
+    - Background: transparent (initially), bistro gold when pressed
+    - Text: bistro brown
+    - On press:
+        1. Animate the chip (scale down to 0.95, then back)
+        2. Send the chip text as a new user message
+        3. Call store.clearQuickReplies()
+        4. Trigger haptic: Haptics.selectionAsync()
+
+File: apps/mobile/src/components/Voice/VoiceButton.tsx
+
+  DESIGN:
+    - Large circular button, 56px diameter
+    - Background: bistro gold when idle, red (#E24B4A) when listening
+    - Microphone icon (use a simple SVG path or expo vector icons)
+    - When listening: outer ring animates (scale from 1 to 1.5, opacity 0 to 1,
+      repeat) — this is the "recording" pulse ring
+
+  BEHAVIOR:
+    - Single tap: start listening
+    - Tap again while listening: stop and submit
+    - Auto-submit after 2 seconds of silence (expo-speech-recognition handles this
+      via the continuous: false option)
+    - During listening: show the transcript in the text input in real time
+      (use interim results from the STT hook)
+
+================================================================================
+  SECTION 13 — MENU SCREEN
+================================================================================
+
+File: apps/mobile/src/screens/HomeScreen.tsx
+
+This screen shows the menu. The user can also tap items to add them directly
+(without using the AI), but the main experience is through chat.
+
+LAYOUT:
+  1. Top: Bistro logo / hero header (warm cream background, brown text)
+     "The Intelligent Bistro" in serif-ish font
+     Subtitle: "Tap to chat · Speak to order"
+  2. Category tabs: horizontal pill tabs for each category
+     (Burgers, Sides, Drinks)
+  3. Menu grid: 2-column grid of MenuCard components
+  4. Bottom tab: "Chat with Bistro" button (navigates to ChatScreen)
+  5. Cart FAB (floating action button) bottom right with item count badge
+
+File: apps/mobile/src/components/Menu/MenuCard.tsx
+
+  DESIGN:
+    - Rounded card, bistro cream background
+    - Large emoji on top (the item's image field)
+    - Item name (bold, brown)
+    - Price (gold)
+    - Short description (gray, small)
+    - Dietary badges (small pills: "VEGAN", "GF", "SPICY")
+    - "+" button bottom right (adds 1 to cart with animation)
+
+  ON PRESS "+":
+    - store.addItem(menuItem, 1)
+    - The "+" button does a quick bounce animation (scale 1 → 1.3 → 1)
+    - Cart badge count increments with a bounce
+
+================================================================================
+  SECTION 14 — CART SHEET
+================================================================================
+
+File: apps/mobile/src/components/Cart/CartSheet.tsx
+
+  Implemented as a bottom sheet modal (use React Native's built-in Modal with
+  a slide-up animation, or @gorhom/bottom-sheet if you want to go further).
+
+  CONTENT:
+    - Header: "Your Order" + close button
+    - List of CartItem components (see below)
+    - Total row at bottom
+    - "Place Order" button (navigates to CheckoutScreen)
+
+File: apps/mobile/src/components/Cart/CartItem.tsx
+
+  CART DIFF ANIMATION:
+    When an item is added:
+      - It slides in from the right (translateX: 80 → 0) with spring physics
+      - Opacity: 0 → 1
+      - Duration: 400ms
+
+    When quantity increases:
+      - The quantity badge does a quick "pop" (scale 1 → 1.4 → 1)
+
+    When an item is removed:
+      - It slides out to the left and fades out
+      - Height animates to 0 after the slide (so no gap appears)
+
+  IMPLEMENTATION: Use react-native-reanimated's Layout animations:
+    entering={SlideInRight.springify().damping(20)}
+    exiting={SlideOutLeft.springify()}
+    layout={Layout.springify()}
+
+  DISPLAY:
+    - Left: item emoji
+    - Middle: item name + price
+    - Right: quantity control (- / count / +)
+    - Swipe left to delete (use react-native-gesture-handler Swipeable)
+
+================================================================================
+  SECTION 15 — CHECKOUT SCREEN
+================================================================================
+
+File: apps/mobile/src/screens/CheckoutScreen.tsx
+
+  FLOW:
+    1. Screen opens
+    2. Automatically trigger an AI recap call:
+       Send a system-level message: "Please narrate my current order naturally
+       before I confirm. Cart: [current cart JSON]"
+    3. Display the AI's narration as an animated text that types in
+    4. Speak it via TTS
+    5. Show order summary card below
+    6. "Confirm Order" button → shows success animation → clears cart
+
+File: apps/mobile/src/components/Checkout/OrderRecap.tsx
+
+  DESIGN:
+    - Receipt-style card (white, subtle shadow, serif-ish font)
+    - Each item line: name ... price
+    - Dotted separator line
+    - Total line (bold, gold)
+    - AI narration text above the card in a special "assistant voice" style
+
+================================================================================
+  SECTION 16 — NAVIGATION
+================================================================================
+
+Use React Navigation with a bottom tab navigator:
+  Tab 1: Home (Menu) — icon: fork and knife
+  Tab 2: Chat — icon: chat bubble — this is the default/active tab
+  Tab 3: Cart — icon: shopping bag + badge count
+
+Stack navigator for:
+  Chat → Checkout (push transition)
+
+File structure:
+  apps/mobile/src/navigation/
+    AppNavigator.tsx    (root navigator)
+    TabNavigator.tsx    (bottom tabs)
+
+================================================================================
+  SECTION 17 — THEME & VISUAL CONSTANTS
+================================================================================
+
+File: apps/mobile/src/constants/theme.ts
+
+export const COLORS = {
+  // Brand
+  bistroCream:   '#F5F0E8',
+  bistroBrown:   '#3D2B1F',
+  bistroGold:    '#C9933A',
+  bistroWarm:    '#E8D5B7',
+  bistroAccent:  '#8B4513',
+  // Dot cluster
+  dotAmber:      '#F5A623',
+  dotGold:       '#F7C06B',
+  dotOrange:     '#E8821A',
+  dotCream:      '#FFF3CD',
+  dotDeep:       '#C9933A',
+  // Semantic
+  success:       '#27AE60',
+  danger:        '#E24B4A',
+  white:         '#FFFFFF',
+  lightGray:     '#F0EDE8',
+  medGray:       '#9E9089',
+  darkGray:      '#5A524A',
+};
+
+export const TYPOGRAPHY = {
+  heading:    { fontSize: 24, fontWeight: '700', color: COLORS.bistroBrown },
+  subheading: { fontSize: 18, fontWeight: '600', color: COLORS.bistroBrown },
+  body:       { fontSize: 16, fontWeight: '400', color: COLORS.bistroBrown },
+  small:      { fontSize: 13, fontWeight: '400', color: COLORS.medGray },
+  price:      { fontSize: 16, fontWeight: '700', color: COLORS.bistroGold },
+};
+
+export const SPACING = {
+  xs: 4, sm: 8, md: 16, lg: 24, xl: 32
+};
+
+export const RADIUS = {
+  sm: 8, md: 12, lg: 16, xl: 24, full: 999
+};
+
+================================================================================
+  SECTION 18 — ENVIRONMENT SETUP
+================================================================================
+
+File: apps/api/.env
+
+  ANTHROPIC_API_KEY=your_key_here
+
+File: apps/api/.env.example  (commit this one, NOT .env)
+
+  ANTHROPIC_API_KEY=
+
+IMPORTANT: Add .env to .gitignore immediately. Never commit API keys.
+
+File: .gitignore (root)
+  node_modules/
+  .env
+  .expo/
+  dist/
+  *.log
+
+================================================================================
+  SECTION 19 — README (Make This Count — Reviewers Read It)
+================================================================================
+
+File: README.md
+
+The README is part of the submission. Write it professionally.
+
+STRUCTURE:
+
+# 🍽️ The Intelligent Bistro
+> AI-powered restaurant ordering — speak your order, watch the cart come alive.
+
+## Demo
+[Link to Loom video]
+
+## Features
+- ✦ **Sentinel Streaming** — AI embeds cart actions inside its response; the cart
+  updates mid-stream before the AI finishes talking
+- 🎙️ **Voice Ordering** — tap to talk, Whisper-quality STT via native OS
+- 🔊 **Voice Feedback** — AI speaks every response back (expo-speech)
+- 🧠 **Dietary Memory** — say "I'm vegan" once, the AI remembers all session
+- ⚡ **Ambiguity Resolution** — unclear orders surface quick-reply chips, not just text
+- 🔮 **Jarvis Dot Cluster** — warm animated dots visualize AI thinking state
+- 🎬 **Cart Diff Animations** — items fly in/out with spring physics
+
+## Architecture
+
+[Include a simple ASCII diagram of the system — same as Section 4 of this doc]
+
+## Tech Stack
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| Mobile | Expo + React Native | Cross-platform |
+| Styling | NativeWind (Tailwind) | Fast, consistent |
+| Animation | react-native-reanimated v3 | 60fps native thread |
+| State | Zustand | Minimal, composable |
+| STT | expo-speech-recognition (native OS) | Zero latency, free |
+| TTS | expo-speech | Instant, native quality |
+| Streaming | Server-Sent Events | Real-time feel |
+| Backend | Express + TypeScript | Clean, typed |
+| AI | Claude Sonnet 4 | Best structured output & tool use |
+
+## Sentinel Streaming — How It Works
+[Explain the sentinel pattern in plain English with a code example]
+
+## Running Locally
+[Step by step setup instructions]
+
+================================================================================
+  SECTION 20 — BUILD ORDER (DO THIS EXACTLY)
+================================================================================
+
+Build in this sequence. Do not skip ahead.
+
+PHASE 1 — FOUNDATION (no AI yet)
+  Step 1: Set up Turborepo root and install dependencies
+  Step 2: Create menu.json and types/index.ts
+  Step 3: Create the Zustand store (all 3 slices)
+  Step 4: Build the theme constants
+  Step 5: Build the navigation skeleton (empty screens)
+  Step 6: Verify app boots without errors
+
+PHASE 2 — MENU SCREEN
+  Step 7: Build MenuCard component
+  Step 8: Build MenuGrid with category tabs
+  Step 9: Build HomeScreen with the menu data (hardcode for now)
+  Step 10: Build CartSheet and CartItem with animations
+  Step 11: Verify: can tap + on menu items, cart updates, sheet opens
+
+PHASE 3 — BACKEND
+  Step 12: Set up Express server
+  Step 13: Implement /menu endpoint
+  Step 14: Implement /chat SSE endpoint (test with curl first)
+  Step 15: Verify streaming works: curl -X POST http://localhost:3001/chat
+           with a test body and confirm SSE events stream to terminal
+
+PHASE 4 — CHAT SCREEN (core feature)
+  Step 16: Build ChatBubble component
+  Step 17: Build ChatList with FlashList
+  Step 18: Implement useStreamParser hook (test in isolation with a mock stream)
+  Step 19: Build ChatInput component
+  Step 20: Wire up api.streamChat in ChatScreen
+  Step 21: Verify: type "add a burger" → AI responds → cart updates mid-stream
+
+PHASE 5 — VOICE
+  Step 22: Build VoiceButton with pulse animation
+  Step 23: Implement useVoiceInput hook
+  Step 24: Wire voice input to chat send
+  Step 25: Implement useTTS hook
+  Step 26: Wire TTS to play after each AI response
+  Step 27: Verify: say "add truffle fries" → transcribed → sent → cart updates → AI speaks
+
+PHASE 6 — JARVIS DOTS
+  Step 28: Build JarvisDots component (idle state first)
+  Step 29: Add isActive state driven by store.isAiSpeaking
+  Step 30: Test active animations
+  Step 31: Integrate into ChatScreen header area
+
+PHASE 7 — ADVANCED FEATURES
+  Step 32: Quick reply chips (clarify action)
+  Step 33: Dietary restriction detection and warnings
+  Step 34: Upsell bubbles (upsell action)
+  Step 35: Cart diff animations (SlideInRight/SlideOutLeft)
+  Step 36: Checkout screen with AI recap and TTS narration
+
+PHASE 8 — POLISH
+  Step 37: Loading states (skeleton screens for menu)
+  Step 38: Error states (network failure handling)
+  Step 39: Haptic feedback on all interactions
+  Step 40: Final visual polish pass on all screens
+  Step 41: Write README
+  Step 42: Record Loom video
+
+================================================================================
+  SECTION 21 — COMMON ERRORS & HOW TO FIX THEM
+================================================================================
+
+ERROR: "Cannot read property 'text' of undefined" in stream parser
+  FIX: The SSE chunk may contain multiple events separated by \n\n.
+       Always split by '\n\n' and process each event individually.
+
+ERROR: Cart updates not triggering animation
+  FIX: Make sure isAnimating resets after 600ms. Use setTimeout in the store
+       action: setTimeout(() => set({ isAnimating: false }), 600)
+
+ERROR: expo-speech-recognition not working on Android
+  FIX: Add RECORD_AUDIO permission to app.json:
+       "android": { "permissions": ["RECORD_AUDIO"] }
+
+ERROR: SSE connection drops after 30 seconds
+  FIX: Add keep-alive pings. Every 15 seconds, write:
+       res.write(':keep-alive\n\n')
+       Use setInterval, and clearInterval on res 'close' event.
+
+ERROR: Reanimated "worklet" errors
+  FIX: Ensure 'react-native-reanimated/plugin' is the LAST plugin in babel.config.js
+       Clear cache: npx expo start --clear
+
+ERROR: Circular orbit not smooth
+  FIX: Use Easing.linear for orbit animations. Any easing other than linear
+       creates visible "snapping." For the orbit angle animation specifically,
+       always use Easing.linear with withRepeat.
+
+ERROR: AI not reliably outputting the sentinel markers
+  FIX: Add this to the system prompt:
+       "CRITICAL: You MUST always use the exact characters ✦ACTION✦ and ✦END✦.
+       These are special Unicode characters (✦ = U+2726). Do not substitute
+       them with asterisks, brackets, or any other characters."
+
+ERROR: fetch() streaming not working on Expo Go
+  FIX: Use expo-dev-client instead of Expo Go for full native API support.
+       Run: npx expo run:android or npx expo run:ios
+
+================================================================================
+  SECTION 22 — LOOM VIDEO SCRIPT (5 MINUTES)
+================================================================================
+
+Record in this order to show maximum impact:
+
+[0:00 - 0:30] HOOK
+  Show the final app running. Say:
+  "This is The Intelligent Bistro — a fully AI-driven ordering experience where
+  you can speak your order, watch the cart update in real time while the AI is
+  still talking, and get personalized suggestions based on your diet."
+
+[0:30 - 1:30] VOICE ORDERING DEMO
+  - Tap the voice button
+  - Say: "I'd like two spicy chicken sandwiches and a large water"
+  - Show the transcript appearing in real time
+  - Show the AI starting to respond
+  - Highlight the moment the cart updates MID-STREAM before AI finishes
+  - Let the AI speak the response back
+
+[1:30 - 2:30] DIETARY MEMORY + UPSELL
+  - Say: "By the way, I'm vegan"
+  - Show AI acknowledge it
+  - Say: "Add a classic burger"
+  - Show AI warn about non-vegan item BEFORE adding
+  - Add the vegan burger instead
+  - Show the upsell suggestion appear as a chip
+
+[2:30 - 3:15] AMBIGUITY RESOLUTION
+  - Say: "Add a chicken sandwich"
+  - Show the quick reply chips appear
+  - Tap one chip
+  - Show the cart update
+
+[3:15 - 4:00] CART ANIMATIONS + CHECKOUT
+  - Open the cart sheet — show the slide-in animations
+  - Remove an item — show it slide out
+  - Navigate to checkout
+  - Show AI narrate the order and speak it back
+
+[4:00 - 4:30] CODE WALKTHROUGH
+  - Briefly show the sentinel parsing hook
+  - Show the system prompt structure
+  - Show the Zustand store
+
+[4:30 - 5:00] CLOSE
+  - Mention: Claude Sonnet 4 for AI, expo-speech for TTS,
+    expo-speech-recognition for STT, Zustand for state,
+    react-native-reanimated for animations
+
+================================================================================
+  END OF INSTRUCTIONS
+================================================================================
+
+This document is the complete specification. Build Phase by Phase.
+Test each phase before moving to the next.
+Every feature described here must be present in the final submission.
+
+Good luck.
+================================================================================

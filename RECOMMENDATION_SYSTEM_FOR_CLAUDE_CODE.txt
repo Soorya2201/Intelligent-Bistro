@@ -1,0 +1,458 @@
+================================================================================
+  BISTRO AI — RECOMMENDATION SYSTEM
+  Instructions for Claude Code (paste this entire file into your terminal session)
+================================================================================
+
+You are building a recommendation engine for the Intelligent Bistro app.
+Read every section before writing any code. Build in the order given.
+
+================================================================================
+  WHAT THIS SYSTEM DOES
+================================================================================
+
+Every time a user interacts with the app — ordering items, searching,
+adding/removing from cart, or asking the AI about something — we log that event.
+The recommendation engine analyzes these logs to surface:
+
+  1. "Often paired" suggestions — items frequently ordered together
+  2. "You might like" — items similar to what this user orders regularly
+  3. "Popular right now" — globally trending items this session
+  4. AI upsell targeting — personalized suggestions injected into the AI system prompt
+
+The engine runs entirely in Node.js on the backend. No external ML service needed.
+It uses co-occurrence matrices and a simple collaborative filtering approach.
+
+================================================================================
+  REPOSITORY LOCATION
+================================================================================
+
+All new files go inside the existing monorepo:
+
+  apps/api/src/
+    services/
+      recommendations.ts       ← core engine (NEW)
+    routes/
+      recommendations.ts       ← HTTP endpoints (NEW)
+    data/
+      events.json              ← persisted event log (NEW, starts as [])
+      cooccurrence.json        ← persisted matrix (NEW, starts as {})
+
+  apps/mobile/src/
+    hooks/
+      useRecommendations.ts    ← frontend hook (NEW)
+    components/
+      Cart/
+        RecommendedPills.tsx   ← "Often paired" pills in cart (NEW)
+
+================================================================================
+  SECTION 1 — EVENT SCHEMA
+================================================================================
+
+Every user action emits one event object. Define this TypeScript type:
+
+File: apps/api/src/types/events.ts
+
+  export type EventType =
+    | 'item_added'       // user added item to cart (via UI or AI)
+    | 'item_removed'     // user removed item from cart
+    | 'item_viewed'      // user tapped/hovered a menu item
+    | 'search_query'     // user typed or spoke a query
+    | 'ai_mentioned'     // AI mentioned an item in its response
+    | 'checkout'         // user placed order (includes full cart snapshot)
+    | 'upsell_accepted'  // user accepted an AI upsell suggestion
+    | 'upsell_rejected'; // user dismissed an AI upsell suggestion
+
+  export interface BistroEvent {
+    id:        string;           // uuid v4
+    sessionId: string;           // generated once per app session
+    timestamp: number;           // Date.now()
+    type:      EventType;
+    itemId?:   string;           // menu item id (for item events)
+    itemName?: string;           // human readable
+    query?:    string;           // for search_query events
+    cartSnapshot?: string[];     // array of itemIds (for checkout events)
+    metadata?: Record<string, unknown>;
+  }
+
+================================================================================
+  SECTION 2 — EVENT LOGGER SERVICE
+================================================================================
+
+File: apps/api/src/services/eventLogger.ts
+
+  PURPOSE: Receives events from the frontend via POST /events, appends them
+  to events.json, and triggers a co-occurrence matrix update.
+
+  FUNCTIONS TO IMPLEMENT:
+
+  logEvent(event: BistroEvent): void
+    - Validate the event shape
+    - Assign a uuid if id is missing
+    - Push to the in-memory events array
+    - Debounce disk write: write events.json at most once every 5 seconds
+      (use a setTimeout, clear previous if called again within 5s)
+    - After writing, call updateCooccurrence(event)
+
+  getEvents(sessionId?: string): BistroEvent[]
+    - If sessionId given: return events for that session only
+    - Otherwise: return all events (last 10,000 max)
+
+  getRecentCheckouts(limit = 50): BistroEvent[]
+    - Return the last N checkout events sorted by timestamp desc
+
+  IMPLEMENTATION NOTES:
+    - Load events.json on server startup into memory (let events: BistroEvent[] = [])
+    - If the file doesn't exist yet, start with an empty array and create it
+    - Keep only the last 10,000 events in memory (slice oldest when over limit)
+    - Use fs/promises for async file I/O
+    - Wrap all disk operations in try/catch
+
+================================================================================
+  SECTION 3 — CO-OCCURRENCE MATRIX
+================================================================================
+
+File: apps/api/src/services/cooccurrence.ts
+
+  PURPOSE: Builds and queries a matrix that tracks how often pairs of items
+  appear together in the same cart (at checkout time).
+
+  DATA STRUCTURE:
+    The matrix is a nested object stored as cooccurrence.json:
+    {
+      "spicy-chicken": {
+        "sweet-potato-fries": 14,
+        "lemonade": 9,
+        "truffle-fries": 3
+      },
+      "classic-burger": {
+        "truffle-fries": 22,
+        "classic-soda": 11
+      },
+      ...
+    }
+
+  FUNCTIONS TO IMPLEMENT:
+
+  updateCooccurrence(event: BistroEvent): void
+    - Only act on events where type === 'checkout'
+    - Extract cartSnapshot (array of itemIds)
+    - For every PAIR of items in the snapshot:
+        matrix[itemA][itemB] += 1
+        matrix[itemB][itemA] += 1  (symmetric)
+    - Save matrix to cooccurrence.json (debounced, same pattern as events)
+
+  getPairings(itemId: string, topN = 3): Array<{itemId: string, score: number}>
+    - Look up matrix[itemId]
+    - Sort entries by score descending
+    - Return top N as [{itemId, score}]
+    - If itemId not in matrix yet, return []
+
+  getTopGlobalItems(topN = 5): Array<{itemId: string, totalScore: number}>
+    - For each itemId in the matrix, sum all its co-occurrence values
+    - Return top N by total score
+    - This surfaces the most "socially ordered" items
+
+  loadMatrix(): void
+    - Read cooccurrence.json on startup, populate in-memory matrix object
+    - If file missing, start with {}
+
+  PSEUDOCODE for pair generation:
+    const ids = event.cartSnapshot || [];
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const a = ids[i], b = ids[j];
+        matrix[a] = matrix[a] || {};
+        matrix[b] = matrix[b] || {};
+        matrix[a][b] = (matrix[a][b] || 0) + 1;
+        matrix[b][a] = (matrix[b][a] || 0) + 1;
+      }
+    }
+
+================================================================================
+  SECTION 4 — SESSION PROFILER
+================================================================================
+
+File: apps/api/src/services/sessionProfiler.ts
+
+  PURPOSE: Builds a lightweight profile for the current session based on
+  events so far. This profile is injected into the AI system prompt so
+  Claude can make personalized suggestions.
+
+  FUNCTION: getSessionProfile(sessionId: string): SessionProfile
+
+  SessionProfile shape:
+    {
+      frequentItems:    string[];  // itemIds ordered most to least frequent this session
+      dietarySignals:   string[];  // e.g. ['vegan', 'gluten-free'] detected from queries/orders
+      searchKeywords:   string[];  // deduplicated words from search_query events
+      totalOrderValue:  number;    // sum of all checkout totals this session
+      orderCount:       number;    // how many checkouts this session
+    }
+
+  PSEUDOCODE:
+    const sessionEvents = getEvents(sessionId);
+
+    // count item frequency
+    const itemFreq: Record<string, number> = {};
+    for each event where type === 'item_added':
+      itemFreq[event.itemId] = (itemFreq[event.itemId] || 0) + 1;
+    frequentItems = Object.entries(itemFreq)
+      .sort((a,b) => b[1] - a[1])
+      .map(([id]) => id);
+
+    // detect dietary signals from queries
+    const DIETARY_KEYWORDS = ['vegan','vegetarian','gluten','nut','dairy','halal','kosher','spicy'];
+    for each event where type === 'search_query':
+      for each keyword in DIETARY_KEYWORDS:
+        if query includes keyword and not already in dietarySignals:
+          dietarySignals.push(keyword);
+
+    // collect search terms
+    searchKeywords = unique words from all search_query events, lowercased, stop-words removed
+
+    // checkout stats
+    const checkouts = sessionEvents.filter(e => e.type === 'checkout');
+    orderCount = checkouts.length;
+    totalOrderValue = checkouts.reduce((sum, e) => {
+      // you'll need to look up item prices from menu.json for each itemId in cartSnapshot
+      return sum + calculateCartValue(e.cartSnapshot);
+    }, 0);
+
+================================================================================
+  SECTION 5 — RECOMMENDATIONS SERVICE
+================================================================================
+
+File: apps/api/src/services/recommendations.ts
+
+  PURPOSE: Main recommendation facade. Combines co-occurrence, session
+  profile, and global popularity into a ranked list of suggestions.
+
+  FUNCTION: getRecommendations(params): RecommendationResult
+
+    params:
+      sessionId:    string
+      currentCart:  string[]     // itemIds currently in cart
+      context:      'cart' | 'post-add' | 'checkout' | 'idle'
+
+    RecommendationResult:
+      {
+        pairings:    RecommendedItem[];   // based on current cart (co-occurrence)
+        forYou:      RecommendedItem[];   // based on session history
+        trending:    RecommendedItem[];   // global popularity
+        aiInsert:    string;              // ready-to-insert text for the AI system prompt
+      }
+
+    RecommendedItem:
+      {
+        itemId:  string;
+        name:    string;
+        emoji:   string;
+        price:   number;
+        reason:  string;   // "Pairs with your burger" / "You ordered this before"
+        score:   number;
+      }
+
+  ALGORITHM:
+
+  Step 1 — Pairings:
+    For each item in currentCart:
+      call getPairings(itemId, 5)
+      collect all results, deduplicate by itemId
+      exclude items already in currentCart
+      sort by score desc, take top 3
+
+  Step 2 — For You:
+    Get sessionProfile.frequentItems
+    For each frequent item, get its pairings
+    Merge, deduplicate, exclude cart items, take top 3
+
+  Step 3 — Trending:
+    Call getTopGlobalItems(5)
+    Exclude items in currentCart
+    Take top 3
+
+  Step 4 — AI Insert:
+    Build a short string to append to the system prompt:
+    "User session profile: they have ordered [frequentItems names].
+     Dietary signals detected: [dietarySignals].
+     Recommended upsells for this cart: [top 2 pairing names].
+     Prioritize suggesting these when relevant."
+
+================================================================================
+  SECTION 6 — API ROUTES
+================================================================================
+
+File: apps/api/src/routes/recommendations.ts
+
+  POST /events
+    Body: BistroEvent (or array of BistroEvent)
+    Action: call logEvent() for each
+    Response: { ok: true }
+
+  GET /recommendations?sessionId=xxx&cart=id1,id2,id3&context=cart
+    Action: parse query params, call getRecommendations()
+    Response: RecommendationResult JSON
+
+  GET /recommendations/pairings?itemId=xxx&n=3
+    Action: call getPairings(itemId, n)
+    Response: { pairings: RecommendedItem[] }
+
+  Mount in apps/api/src/index.ts:
+    import recoRouter from './routes/recommendations';
+    app.use('/recommendations', recoRouter);
+    app.use('/events', recoRouter);
+
+================================================================================
+  SECTION 7 — INJECT INTO AI SYSTEM PROMPT
+================================================================================
+
+File: apps/api/src/services/anthropic.ts  (MODIFY existing file)
+
+  In the buildSystemPrompt() function, add a new parameter:
+    recoContext: string   (the aiInsert string from getRecommendations)
+
+  Add this block at the end of the system prompt:
+
+  === PERSONALIZATION CONTEXT ===
+  [INSERT recoContext HERE]
+
+  Use this to make your upsell suggestions feel personalized and timely.
+  Do not reveal that you are using recommendation data — just sound naturally
+  knowledgeable about what this customer tends to enjoy.
+
+  In the /chat route handler:
+    1. Before calling buildSystemPrompt(), call getRecommendations()
+    2. Pass result.aiInsert to buildSystemPrompt()
+
+================================================================================
+  SECTION 8 — FRONTEND HOOK
+================================================================================
+
+File: apps/mobile/src/hooks/useRecommendations.ts
+
+  PURPOSE: Fetches recommendations from the backend whenever the cart changes.
+  Also fires events to the backend on every user action.
+
+  STATE:
+    recommendations: RecommendationResult | null
+    isLoading: boolean
+
+  FUNCTION: logEvent(event: Partial<BistroEvent>)
+    - Adds sessionId (stored in AsyncStorage or a module-level const)
+    - Adds timestamp and uuid
+    - POST to /events in the background (fire and forget, no await needed in UI)
+
+  EFFECT: useEffect on cart changes
+    - If cart is empty, skip
+    - Fetch /recommendations?sessionId=...&cart=...&context=cart
+    - Update state
+
+  RETURNS:
+    { recommendations, isLoading, logEvent }
+
+  USAGE EXAMPLE IN CartSheet.tsx:
+    const { recommendations, logEvent } = useRecommendations();
+
+    // When user adds item:
+    logEvent({ type: 'item_added', itemId: item.id, itemName: item.name });
+
+    // In render:
+    <RecommendedPills items={recommendations?.pairings} />
+
+================================================================================
+  SECTION 9 — FRONTEND COMPONENT
+================================================================================
+
+File: apps/mobile/src/components/Cart/RecommendedPills.tsx
+
+  PROPS:
+    items: RecommendedItem[]
+    onAdd: (item: RecommendedItem) => void
+
+  DESIGN:
+    - Horizontal ScrollView
+    - Each pill: rounded, border, shows emoji + name + price
+    - Tap → calls onAdd → calls logEvent({ type: 'upsell_accepted', ... })
+    - Dismiss button (×) on each pill → calls logEvent({ type: 'upsell_rejected', ... })
+    - Animate in with spring: entering={SlideInRight.springify()}
+
+  The component should only render if items.length > 0.
+  Show a subtle "Often paired" label above the pills.
+
+================================================================================
+  SECTION 10 — BUILD ORDER
+================================================================================
+
+Build in this exact sequence to avoid import errors:
+
+  1. Create apps/api/src/data/events.json       → content: []
+  2. Create apps/api/src/data/cooccurrence.json → content: {}
+  3. Create apps/api/src/types/events.ts
+  4. Create apps/api/src/services/eventLogger.ts
+  5. Create apps/api/src/services/cooccurrence.ts
+  6. Create apps/api/src/services/sessionProfiler.ts
+  7. Create apps/api/src/services/recommendations.ts
+  8. Create apps/api/src/routes/recommendations.ts
+  9. Modify apps/api/src/index.ts to mount the new router
+  10. Modify apps/api/src/services/anthropic.ts to accept and inject recoContext
+  11. Modify apps/api/src/routes/chat.ts to call getRecommendations() before streaming
+  12. Create apps/mobile/src/hooks/useRecommendations.ts
+  13. Create apps/mobile/src/components/Cart/RecommendedPills.tsx
+  14. Wire RecommendedPills into CartSheet.tsx
+
+================================================================================
+  SECTION 11 — SEEDING TEST DATA
+================================================================================
+
+To make the recommendation system show real results immediately during the
+demo (before real users have generated events), create a seed script:
+
+File: apps/api/src/scripts/seed.ts
+
+  Run with: npx ts-node src/scripts/seed.ts
+
+  Generate 200 synthetic checkout events with realistic cart combinations:
+    - Burger + fries combos (most common): 40% of orders
+    - Burger + fries + drink: 30% of orders
+    - Chicken + sweet potato + drink: 20% of orders
+    - Salad + sparkling water: 10% of orders
+
+  For each synthetic checkout event:
+    - Random sessionId (generate 20 unique fake sessions)
+    - timestamp: random in last 7 days
+    - type: 'checkout'
+    - cartSnapshot: array of itemIds for that combo
+
+  After generating all events:
+    - Write to events.json
+    - Call updateCooccurrence() for each event to build the matrix
+    - Write cooccurrence.json
+
+  This way, when the first real user opens the app, the "Often paired"
+  and "Trending" sections already have data.
+
+================================================================================
+  SECTION 12 — TESTING CHECKLIST
+================================================================================
+
+After building everything, verify:
+
+  [ ] POST /events with a single item_added event returns { ok: true }
+  [ ] POST /events with a checkout event containing 3 items updates cooccurrence.json
+  [ ] GET /recommendations?sessionId=test&cart=classic-burger&context=cart
+      returns pairings that include truffle-fries (after seeding)
+  [ ] GET /recommendations/pairings?itemId=spicy-chicken&n=3
+      returns sweet-potato-fries and lemonade near the top
+  [ ] The AI response to "add a burger" includes a personalized upsell
+      that matches what the recommendation engine suggested
+  [ ] RecommendedPills renders in CartSheet when cart has 1+ items
+  [ ] Tapping a pill calls logEvent with type: 'upsell_accepted'
+  [ ] Dismissing a pill calls logEvent with type: 'upsell_rejected'
+
+================================================================================
+  END OF INSTRUCTIONS
+================================================================================
+
+Paste this entire file content to Claude Code in terminal.
+It has all context needed to complete the task without follow-up questions.
+================================================================================

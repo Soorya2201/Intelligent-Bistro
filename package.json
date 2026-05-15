@@ -1,0 +1,21 @@
+{
+  "name": "intelligent-bistro",
+  "private": true,
+  "packageManager": "npm@11.11.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "api": "cd apps/api && ../../node_modules/.bin/ts-node src/index.ts",
+    "mobile": "cd apps/mobile && expo start --clear",
+    "mobile:tunnel": "cd apps/mobile && expo start --tunnel --clear"
+  },
+  "devDependencies": {
+    "turbo": "latest"
+  },
+  "dependencies": {
+    "tailwindcss": "^3.4.19"
+  }
+}
