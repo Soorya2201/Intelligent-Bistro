@@ -17,6 +17,13 @@ export function useVoiceInput(onTranscript: (text: string) => void, _speechRef?:
   const startListening = useCallback(async () => {
     setError(null);
     try {
+      // Unload any previous recording before creating a new one — expo-av
+      // only allows one active Recording at a time.
+      if (recordingRef.current) {
+        await recordingRef.current.stopAndUnloadAsync().catch(() => {});
+        recordingRef.current = null;
+      }
+
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') { setError('Microphone permission denied.'); return; }
 
