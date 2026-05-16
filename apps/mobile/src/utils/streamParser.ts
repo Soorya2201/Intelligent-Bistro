@@ -1,58 +1,55 @@
-import { CartAction } from '../types';
+export type SSEEventType = 'actions' | 'delta' | 'done' | 'recommendations' | 'error';
 
-const SENTINEL_OPEN  = '✦ACTION✦';
-const SENTINEL_CLOSE = '✦END✦';
-
-export interface ParseResult {
-  visibleText: string;
-  actions: CartAction[];
+export interface ToolCallPayload {
+  name: string;
+  input: Record<string, unknown>;
+  status: 'applied' | 'rejected';
+  rejectionReason?: string;
 }
 
-export function createStreamParser() {
-  let buffer       = '';
-  let insideAction = false;
-  let actionBuffer = '';
+export interface RecommendationItem {
+  item_id: string;
+  name: string;
+  price: number;
+  image: string;
+  reason: string;
+  score: number;
+  source: string;
+}
 
-  function processChunk(rawChunk: string): ParseResult {
-    let visibleText = '';
-    const actions: CartAction[] = [];
+export interface ParsedSSEEvent {
+  type: SSEEventType;
+  text?: string;
+  actions?: ToolCallPayload[];
+  recommendations?: RecommendationItem[];
+  message?: string;
+}
 
-    for (const c of rawChunk) {
-      if (!insideAction) {
-        buffer += c;
-        if (buffer.endsWith(SENTINEL_OPEN)) {
-          insideAction  = true;
-          actionBuffer  = '';
-          // Strip the partial sentinel chars already appended to visibleText
-          visibleText = visibleText.slice(0, -(SENTINEL_OPEN.length - 1));
-        } else {
-          visibleText += c;
-        }
-      } else {
-        actionBuffer += c;
-        if (actionBuffer.endsWith(SENTINEL_CLOSE)) {
-          const jsonStr = actionBuffer.slice(0, -SENTINEL_CLOSE.length);
-          try {
-            const action = JSON.parse(jsonStr) as CartAction;
-            actions.push(action);
-          } catch {
-            // malformed JSON — swallow silently
-          }
-          insideAction  = false;
-          actionBuffer  = '';
-          buffer        = '';
-        }
-      }
-    }
+export function parseSSEEvent(line: string): ParsedSSEEvent | null {
+  if (!line.startsWith('data: ')) return null;
+  const jsonStr = line.slice(6).trim();
+  if (!jsonStr) return null;
 
-    return { visibleText, actions };
+  try {
+    const raw = JSON.parse(jsonStr) as Record<string, unknown>;
+    if (!raw.type) return null;
+
+    const event: ParsedSSEEvent = { type: raw.type as SSEEventType };
+
+    if (raw.text !== undefined)    event.text    = raw.text as string;
+    if (raw.actions !== undefined) event.actions = raw.actions as ToolCallPayload[];
+    if (raw.message !== undefined) event.message = raw.message as string;
+
+    // Backend sends "items" for recommendations — normalise to "recommendations"
+    if (raw.items !== undefined)          event.recommendations = raw.items as RecommendationItem[];
+    if (raw.recommendations !== undefined) event.recommendations = raw.recommendations as RecommendationItem[];
+
+    return event;
+  } catch {
+    return null;
   }
+}
 
-  function reset() {
-    buffer       = '';
-    insideAction = false;
-    actionBuffer = '';
-  }
-
-  return { processChunk, reset };
+export function stripSentinels(text: string): string {
+  return text.replace(/✦ACTION✦.*?✦END✦/gs, '').replace(/\s{2,}/g, ' ').trim();
 }

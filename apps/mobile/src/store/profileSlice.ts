@@ -4,16 +4,19 @@ import { MenuItem } from '../types';
 export interface ProfileSlice {
   restrictions: string[];
   likedItems: MenuItem[];
+  email: string;
   addRestriction:    (restriction: string) => void;
   removeRestriction: (restriction: string) => void;
   clearRestrictions: () => void;
   toggleLike: (item: MenuItem) => void;
   isLiked:    (id: string) => boolean;
+  setEmail:   (email: string) => void;
 }
 
 export const createProfileSlice: StateCreator<ProfileSlice, [], [], ProfileSlice> = (set, get) => ({
   restrictions: [],
   likedItems:   [],
+  email:        '',
 
   addRestriction: (restriction) => set((state) => ({
     restrictions: state.restrictions.includes(restriction)
@@ -34,5 +37,6 @@ export const createProfileSlice: StateCreator<ProfileSlice, [], [], ProfileSlice
     };
   }),
 
-  isLiked: (id) => get().likedItems.some(i => i.id === id),
+  isLiked:  (id) => get().likedItems.some(i => i.id === id),
+  setEmail: (email) => set({ email }),
 });

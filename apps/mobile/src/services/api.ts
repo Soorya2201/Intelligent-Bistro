@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { ChatMessage, CartItem, UserProfile } from '../types';
+import { ToolCallRecord, RecommendationItem } from '../types';
 
 const API_BASE = Platform.OS === 'web'
   ? 'http://localhost:3001'
@@ -16,22 +17,65 @@ export const fetchMenu = async () => {
   }
 };
 
+export const fetchRecommendations = async (
+  sessionId: string,
+  cartItemIds: string[],
+  dietary: string[] = [],
+) => {
+  try {
+    const params = new URLSearchParams({
+      sessionId,
+      cartItemIds: cartItemIds.join(','),
+      dietary: dietary.join(','),
+    });
+    const res = await fetch(`${API_BASE}/api/recommendations?${params}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.recommendations || [];
+  } catch {
+    return [];
+  }
+};
+
+export const placeOrder = async (data: {
+  sessionId: string;
+  items: Array<{ item_id: string; name: string; quantity: number; price: number; notes?: string }>;
+  subtotal: number;
+  tax: number;
+  total: number;
+  email?: string;
+}) => {
+  const res = await fetch(`${API_BASE}/api/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to place order');
+  return res.json();
+};
+
+export interface StreamChatCallbacks {
+  onActions: (actions: ToolCallRecord[]) => void;
+  onDelta: (text: string) => void;
+  onRecommendations: (items: RecommendationItem[]) => void;
+  onDone: () => void;
+  onError: (err: string) => void;
+}
+
 // XHR instead of fetch: React Native's XMLHttpRequest is native and its
-// onprogress callback handles SSE reliably on Android. fetch().body.getReader()
-// returns null on Android Hermes and loses partial chunks on all platforms.
+// onprogress callback handles SSE reliably on Android.
 export const streamChat = (
   messages: ChatMessage[],
   cart: CartItem[],
   profile: UserProfile,
-  onChunk: (text: string) => void,
-  onDone: () => void,
-  onError: (err: string) => void,
+  callbacks: StreamChatCallbacks,
+  sessionId?: string,
 ): Promise<void> => {
   return new Promise((resolve) => {
-    const xhr     = new XMLHttpRequest();
-    let buffer    = '';
-    let lastPos   = 0;
-    let settled   = false;
+    const xhr   = new XMLHttpRequest();
+    let buffer  = '';
+    let lastPos = 0;
+    let settled = false;
 
     const settle = (fn: () => void) => {
       if (settled) return;
@@ -41,7 +85,6 @@ export const streamChat = (
     };
 
     const flush = () => {
-      // Split on SSE event boundary; keep any trailing incomplete chunk in buffer
       const parts = buffer.split('\n\n');
       buffer = parts.pop() ?? '';
 
@@ -53,9 +96,31 @@ export const streamChat = (
         const jsonStr = line.slice(6).trim();
         try {
           const parsed = JSON.parse(jsonStr);
-          if (parsed.error) { settle(() => onError(parsed.error)); return; }
-          if (parsed.done)  { settle(onDone); return; }
-          if (parsed.text)  { onChunk(parsed.text); }
+
+          if (parsed.error || parsed.type === 'error') {
+            settle(() => callbacks.onError(parsed.message || parsed.error || 'Server error'));
+            return;
+          }
+
+          switch (parsed.type) {
+            case 'actions':
+              if (parsed.actions) callbacks.onActions(parsed.actions);
+              break;
+            case 'delta':
+              if (parsed.text) callbacks.onDelta(parsed.text);
+              break;
+            case 'recommendations':
+              if (parsed.items) callbacks.onRecommendations(parsed.items);
+              break;
+            case 'done':
+              settle(callbacks.onDone);
+              return;
+
+            // Legacy support for old SSE format
+            default:
+              if (parsed.done)  { settle(callbacks.onDone); return; }
+              if (parsed.text)  { callbacks.onDelta(parsed.text); }
+          }
         } catch {
           console.warn('SSE parse — skipped partial chunk');
         }
@@ -74,18 +139,33 @@ export const streamChat = (
     };
 
     xhr.onload = () => {
-      buffer += '\n\n'; // ensure trailing event gets flushed
+      buffer += '\n\n';
       flush();
-      settle(onDone);
+      settle(callbacks.onDone);
     };
 
-    xhr.onerror   = () => settle(() => onError('Cannot reach server — is the API running?'));
-    xhr.ontimeout = () => settle(() => onError('Request timed out.'));
+    xhr.onerror   = () => settle(() => callbacks.onError('Cannot reach server — is the API running?'));
+    xhr.ontimeout = () => settle(() => callbacks.onError('Request timed out.'));
+
+    // Normalise cart for the API
+    const normalisedCart = cart.map(c => ({
+      item_id:  c.menuItem.id,
+      name:     c.menuItem.name,
+      quantity: c.quantity,
+      price:    c.menuItem.price,
+      notes:    c.specialInstructions,
+    }));
 
     xhr.send(JSON.stringify({
       messages: messages.map(m => ({ role: m.role, content: m.content })),
-      cart,
-      profile,
+      cart: normalisedCart,
+      profile: {
+        restrictions: profile.restrictions,
+        dietary:      profile.restrictions,
+        likedItems:   profile.likedItems,
+        liked:        (profile.likedItems || []).map(i => i.id),
+      },
+      sessionId,
     }));
   });
 };

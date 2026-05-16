@@ -5,12 +5,15 @@ type RawItem = {
   name: string;
   price: number;
   description: string;
-  dietary: string[];
+  tags: string[];
+  allergens: string[];
   pairings: string[];
   image: string;
+  category: string;
+  calories: number;
 };
 
-const allItems: RawItem[] = menuData.categories.flatMap(cat => cat.items as RawItem[]);
+const allItems: RawItem[] = menuData.categories.flatMap(cat => cat.items as unknown as RawItem[]);
 const allIds   = new Set(allItems.map(i => i.id));
 
 describe('menu.json — structure', () => {
@@ -31,6 +34,10 @@ describe('menu.json — structure', () => {
     for (const cat of menuData.categories) {
       expect(cat.items.length).toBeGreaterThan(0);
     }
+  });
+
+  it('has 28 or more menu items across all categories', () => {
+    expect(allItems.length).toBeGreaterThanOrEqual(28);
   });
 });
 
@@ -62,9 +69,15 @@ describe('menu.json — item fields', () => {
     }
   });
 
-  it('every item has a dietary array', () => {
+  it('every item has a tags array', () => {
     for (const item of allItems) {
-      expect(Array.isArray(item.dietary)).toBe(true);
+      expect(Array.isArray(item.tags)).toBe(true);
+    }
+  });
+
+  it('every item has an allergens array', () => {
+    for (const item of allItems) {
+      expect(Array.isArray(item.allergens)).toBe(true);
     }
   });
 
@@ -78,6 +91,13 @@ describe('menu.json — item fields', () => {
     for (const item of allItems) {
       expect(typeof item.image).toBe('string');
       expect(item.image.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('every item has a category field', () => {
+    for (const item of allItems) {
+      expect(typeof item.category).toBe('string');
+      expect(item.category.length).toBeGreaterThan(0);
     }
   });
 });

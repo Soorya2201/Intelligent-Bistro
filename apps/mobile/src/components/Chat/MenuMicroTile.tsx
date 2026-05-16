@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useStore } from '../../store';
 import { COLORS, RADIUS } from '../../constants/theme';
 import { SuggestedItem } from '../../types';
+import { MENU_IMAGES } from '../../constants/menuImages';
 
 interface Props {
   item: SuggestedItem;
@@ -12,25 +13,32 @@ interface Props {
 
 export default function MenuMicroTile({ item }: Props) {
   const addItem = useStore(s => s.addItem);
+  const photo   = MENU_IMAGES[item.id];
 
   const handleAdd = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     addItem(
-      { id: item.id, name: item.name, price: item.price, description: '', dietary: [], pairings: [], image: item.image },
+      { id: item.id, name: item.name, price: item.price, description: '', pairings: [], image: item.image },
       1,
     );
   };
 
   return (
     <TouchableOpacity style={styles.tile} onPress={handleAdd} activeOpacity={0.75}>
-      <View style={styles.emojiArea}>
-        <Text style={styles.emoji}>{item.image}</Text>
-      </View>
-      <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
-      <View style={styles.footer}>
-        <Text style={styles.price}>${item.price.toFixed(2)}</Text>
-        <View style={styles.addBtn}>
-          <Feather name="plus" size={10} color="#fff" />
+      {photo ? (
+        <Image source={photo} style={styles.photo} resizeMode="cover" />
+      ) : (
+        <View style={styles.emojiArea}>
+          <Text style={styles.emoji}>{item.image}</Text>
+        </View>
+      )}
+      <View style={styles.body}>
+        <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+        <View style={styles.footer}>
+          <Text style={styles.price}>${item.price.toFixed(2)}</Text>
+          <View style={styles.addBtn}>
+            <Feather name="plus" size={10} color="#fff" />
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -39,12 +47,12 @@ export default function MenuMicroTile({ item }: Props) {
 
 const styles = StyleSheet.create({
   tile: {
-    width: 84,
+    width: 90,
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.md,
     borderWidth: 0.5,
     borderColor: COLORS.border,
-    padding: 8,
+    overflow: 'hidden',
     marginRight: 8,
     shadowColor: '#000',
     shadowOpacity: 0.06,
@@ -52,13 +60,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
+  photo: {
+    width: '100%',
+    height: 56,
+  },
   emojiArea: {
-    height: 36,
+    height: 56,
+    backgroundColor: COLORS.bistroCream,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 5,
   },
   emoji: { fontSize: 26 },
+  body: {
+    padding: 7,
+  },
   name: {
     fontSize: 10,
     fontWeight: '600',

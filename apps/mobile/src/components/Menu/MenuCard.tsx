@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { MenuItem } from '../../types';
 import { useStore } from '../../store';
 import { COLORS } from '../../constants/theme';
+import { MENU_IMAGES } from '../../constants/menuImages';
 import * as Haptics from 'expo-haptics';
 
 interface MenuCardProps {
@@ -12,31 +13,13 @@ interface MenuCardProps {
   index?: number;
 }
 
-const ITEM_IMAGES: Record<string, any> = {
-  // Burgers
-  'classic-burger':      require('../../../../../assets/Classic Bistro Burger.jpeg'),
-  'vegan-burger':        require('../../../../../assets/Beyond bistro Burger.jpeg'),
-  'mushroom-burger':     require('../../../../../assets/Mushroom swiss burger.jpeg'),
-  'bbq-burger':          require('../../../../../assets/Smokehouse BBQ Burger.jpeg'),
-  'spicy-chicken':       require('../../../../../assets/Spicy Chicken Sandwich.jpeg'),
-  // Sides
-  'truffle-fries':       require('../../../../../assets/truffle fries.jpeg'),
-  'sweet-potato-fries':  require('../../../../../assets/sweet potato fries.jpeg'),
-  'side-salad':          require('../../../../../assets/garden side salad.jpeg'),
-  'onion-rings':         require('../../../../../assets/onion Rings.jpeg'),
-  // Drinks
-  'classic-soda':        require('../../../../../assets/classic soda.jpeg'),
-  'lemonade':            require('../../../../../assets/Fresh Lemonade.jpeg'),
-  'iced-tea':            require('../../../../../assets/professional-food-photography-iced-tea-w_kwJ2A0h-UcqkyFQqCO4GAg_6jMsN8xHQxO_pTpK76cipg_sd.jpeg'),
-  'sparkling-water':     require('../../../../../assets/sparkling water.jpeg'),
-  'large-water':         require('../../../../../assets/Still Water (Large).jpeg'),
-};
-
 const DIET_COLOR: Record<string, { bg: string; text: string }> = {
   vegetarian:    { bg: '#EAF4EE', text: '#2E7D52' },
   vegan:         { bg: '#EAF4EE', text: '#2E7D52' },
   'gluten-free': { bg: '#FEF6E4', text: '#8B6914' },
   gluten:        { bg: '#FEF0EF', text: '#C0392B' },
+  spicy:         { bg: '#FEF0EF', text: '#C0392B' },
+  popular:       { bg: '#FFF3E0', text: '#E65100' },
 };
 
 export default function MenuCard({ item, index = 0 }: MenuCardProps) {
@@ -46,14 +29,14 @@ export default function MenuCard({ item, index = 0 }: MenuCardProps) {
   const toggleLike     = useStore(s => s.toggleLike);
   const isLiked        = useStore(s => s.isLiked(item.id));
 
-  const qty = cartItems.find(i => i.menuItem.id === item.id)?.quantity ?? 0;
+  const qty    = cartItems.find(i => i.menuItem.id === item.id)?.quantity ?? 0;
+  const photo  = MENU_IMAGES[item.id];
+  const dietaryTags = (item.tags ?? item.dietary ?? []).slice(0, 2);
 
   const handleAdd      = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); addItem(item, 1); };
   const handleIncrease = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updateQuantity(item.id, qty + 1); };
   const handleDecrease = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updateQuantity(item.id, qty - 1); };
   const handleLike     = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleLike(item); };
-
-  const photo = ITEM_IMAGES[item.id];
 
   return (
     <Animated.View
@@ -66,14 +49,12 @@ export default function MenuCard({ item, index = 0 }: MenuCardProps) {
         {photo ? (
           <View style={styles.heroImage}>
             <Image source={photo} style={styles.image} resizeMode="cover" />
-            <View style={styles.imageAccent} />
             <TouchableOpacity style={styles.heartBtn} onPress={handleLike} activeOpacity={0.75}>
               <Feather name="heart" size={14} color={isLiked ? COLORS.danger : '#fff'} />
             </TouchableOpacity>
           </View>
         ) : (
           <>
-            <View style={styles.accent} />
             <View style={styles.heroEmoji}>
               <Text style={styles.emoji}>{item.image}</Text>
               <TouchableOpacity style={styles.heartBtnEmoji} onPress={handleLike} activeOpacity={0.75}>
@@ -87,9 +68,9 @@ export default function MenuCard({ item, index = 0 }: MenuCardProps) {
           <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
           <Text style={styles.desc} numberOfLines={2}>{item.description}</Text>
 
-          {item.dietary.length > 0 && (
+          {dietaryTags.length > 0 && (
             <View style={styles.tags}>
-              {item.dietary.slice(0, 2).map(d => {
+              {dietaryTags.map(d => {
                 const c = DIET_COLOR[d] ?? { bg: COLORS.bistroCream, text: COLORS.medGray };
                 return (
                   <View key={d} style={[styles.tag, { backgroundColor: c.bg }]}>
@@ -145,13 +126,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
 
-  // ── Photo hero ───────────────────────────────────────────────
   heroImage: { position: 'relative' },
   image: { width: '100%', height: 130 },
-  imageAccent: {
-    position: 'absolute', top: 0, left: 0, right: 0,
-    height: 3, backgroundColor: COLORS.bistroGold,
-  },
   heartBtn: {
     position: 'absolute', top: 10, right: 10,
     width: 30, height: 30, borderRadius: 15,
@@ -159,19 +135,16 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  // ── Emoji hero ───────────────────────────────────────────────
-  accent:        { height: 3, backgroundColor: COLORS.bistroGold },
   heroEmoji: {
     backgroundColor: COLORS.bistroCream, paddingVertical: 18,
     alignItems: 'center', justifyContent: 'center',
   },
-  emoji:         { fontSize: 48, lineHeight: 56 },
+  emoji:        { fontSize: 48, lineHeight: 56 },
   heartBtnEmoji: {
     position: 'absolute', top: 8, right: 10,
     padding: 6,
   },
 
-  // ── Body ─────────────────────────────────────────────────────
   body:    { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6 },
   name:    { fontSize: 13, fontWeight: '700', color: COLORS.bistroBrown, lineHeight: 18, marginBottom: 4 },
   desc:    { fontSize: 11, color: COLORS.medGray, lineHeight: 15, marginBottom: 7 },
@@ -179,7 +152,6 @@ const styles = StyleSheet.create({
   tag:     { borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
   tagText: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
 
-  // ── Footer ───────────────────────────────────────────────────
   footer: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 12, paddingBottom: 12, paddingTop: 6,

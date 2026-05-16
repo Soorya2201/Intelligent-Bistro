@@ -1,209 +1,174 @@
-import { createStreamParser } from '../streamParser';
+// Updated for v2: structured SSE parser (replaced sentinel protocol)
+import { parseSSEEvent, stripSentinels } from '../streamParser';
 import { ITEM_IMAGES } from '../../constants/itemImages';
 import menuData from '../../../../api/src/data/menu.json';
 
-const OPEN  = '✦ACTION✦';
-const CLOSE = '✦END✦';
-
-function action(json: object) {
-  return `${OPEN}${JSON.stringify(json)}${CLOSE}`;
-}
-
-describe('createStreamParser — text passthrough', () => {
-  it('returns plain text unchanged', () => {
-    const parser = createStreamParser();
-    const { visibleText, actions } = parser.processChunk('Hello, welcome!');
-    expect(visibleText).toBe('Hello, welcome!');
-    expect(actions).toHaveLength(0);
+describe('parseSSEEvent — text passthrough (delta events)', () => {
+  it('returns visible text from a delta event', () => {
+    const line   = 'data: {"type":"delta","text":"Hello, welcome!"}';
+    const result = parseSSEEvent(line);
+    expect(result).not.toBeNull();
+    expect(result!.text).toBe('Hello, welcome!');
+    expect(result!.type).toBe('delta');
   });
 
-  it('accumulates text across multiple chunks', () => {
-    const parser = createStreamParser();
-    const r1 = parser.processChunk('Hello ');
-    const r2 = parser.processChunk('world');
-    expect(r1.visibleText + r2.visibleText).toBe('Hello world');
+  it('accumulates text across multiple delta events', () => {
+    const r1 = parseSSEEvent('data: {"type":"delta","text":"Hello "}');
+    const r2 = parseSSEEvent('data: {"type":"delta","text":"world"}');
+    const combined = (r1?.text || '') + (r2?.text || '');
+    expect(combined).toBe('Hello world');
   });
 
-  it('returns empty string for empty chunk', () => {
-    const parser = createStreamParser();
-    const { visibleText } = parser.processChunk('');
-    expect(visibleText).toBe('');
+  it('returns null for empty data line', () => {
+    expect(parseSSEEvent('data: ')).toBeNull();
   });
 });
 
-describe('createStreamParser — sentinel stripping', () => {
-  it('strips a complete action from visible text', () => {
-    const parser = createStreamParser();
-    const chunk  = `Added! ${action({ op: 'add', items: [{ id: 'classic-burger', name: 'Classic Bistro Burger', qty: 1, price: 14.5 }] })} Enjoy!`;
-    const { visibleText } = parser.processChunk(chunk);
-    expect(visibleText).toBe('Added!  Enjoy!');
+describe('parseSSEEvent — actions event', () => {
+  it('parses an applied add_item tool call', () => {
+    const payload = {
+      type: 'actions',
+      actions: [{ name: 'add_item', input: { item_id: 'truffle-fries', quantity: 2 }, status: 'applied' }],
+    };
+    const result = parseSSEEvent(`data: ${JSON.stringify(payload)}`);
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe('actions');
+    expect(result!.actions).toHaveLength(1);
+    expect(result!.actions![0].name).toBe('add_item');
+    expect(result!.actions![0].status).toBe('applied');
   });
 
-  it('returns empty visible text for chunk that is only an action', () => {
-    const parser = createStreamParser();
-    const { visibleText } = parser.processChunk(action({ op: 'clear' }));
-    expect(visibleText).toBe('');
+  it('parses a rejected tool call', () => {
+    const payload = {
+      type: 'actions',
+      actions: [{ name: 'add_item', input: {}, status: 'rejected', rejectionReason: 'Missing item_id' }],
+    };
+    const result = parseSSEEvent(`data: ${JSON.stringify(payload)}`);
+    expect(result!.actions![0].status).toBe('rejected');
+    expect(result!.actions![0].rejectionReason).toBe('Missing item_id');
   });
 
-  it('preserves text before and after action', () => {
-    const parser = createStreamParser();
-    const { visibleText } = parser.processChunk(`Before${action({ op: 'clear' })}After`);
-    expect(visibleText).toBe('BeforeAfter');
-  });
-});
-
-describe('createStreamParser — action parsing', () => {
-  it('parses an add action', () => {
-    const parser = createStreamParser();
-    const { actions } = parser.processChunk(
-      action({ op: 'add', items: [{ id: 'classic-burger', name: 'Classic Bistro Burger', qty: 2, price: 14.5 }] })
-    );
-    expect(actions).toHaveLength(1);
-    expect(actions[0].op).toBe('add');
-    expect(actions[0].items![0]).toEqual({ id: 'classic-burger', name: 'Classic Bistro Burger', qty: 2, price: 14.5 });
+  it('parses a remove_item tool call', () => {
+    const payload = {
+      type: 'actions',
+      actions: [{ name: 'remove_item', input: { item_id: 'truffle-fries' }, status: 'applied' }],
+    };
+    const result = parseSSEEvent(`data: ${JSON.stringify(payload)}`);
+    expect(result!.actions![0].name).toBe('remove_item');
   });
 
-  it('parses a remove action', () => {
-    const parser = createStreamParser();
-    const { actions } = parser.processChunk(
-      action({ op: 'remove', items: [{ id: 'classic-burger', name: 'Classic Bistro Burger', qty: 0, price: 0 }] })
-    );
-    expect(actions[0].op).toBe('remove');
+  it('parses an update_quantity tool call', () => {
+    const payload = {
+      type: 'actions',
+      actions: [{ name: 'update_quantity', input: { item_id: 'truffle-fries', new_quantity: 3 }, status: 'applied' }],
+    };
+    const result = parseSSEEvent(`data: ${JSON.stringify(payload)}`);
+    expect(result!.actions![0].input.new_quantity).toBe(3);
   });
 
-  it('parses an update action', () => {
-    const parser = createStreamParser();
-    const { actions } = parser.processChunk(
-      action({ op: 'update', items: [{ id: 'classic-burger', name: 'Classic Bistro Burger', qty: 3, price: 14.5 }] })
-    );
-    expect(actions[0].op).toBe('update');
-    expect(actions[0].items![0].qty).toBe(3);
+  it('parses a clarify tool call', () => {
+    const payload = {
+      type: 'actions',
+      actions: [{ name: 'clarify', input: { question: 'Which burger?', options: ['Classic', 'Wagyu'] }, status: 'applied' }],
+    };
+    const result = parseSSEEvent(`data: ${JSON.stringify(payload)}`);
+    expect(result!.actions![0].name).toBe('clarify');
+    expect((result!.actions![0].input.options as string[])).toEqual(['Classic', 'Wagyu']);
   });
 
-  it('parses a clear action', () => {
-    const parser = createStreamParser();
-    const { actions } = parser.processChunk(action({ op: 'clear' }));
-    expect(actions[0].op).toBe('clear');
+  it('parses an upsell tool call', () => {
+    const payload = {
+      type: 'actions',
+      actions: [{ name: 'upsell', input: { item_id: 'truffle-fries', pitch: 'Try the fries!' }, status: 'applied' }],
+    };
+    const result = parseSSEEvent(`data: ${JSON.stringify(payload)}`);
+    expect(result!.actions![0].name).toBe('upsell');
   });
 
-  it('parses a clarify action with options', () => {
-    const parser = createStreamParser();
-    const { actions } = parser.processChunk(
-      action({ op: 'clarify', question: 'Which burger?', options: ['Classic', 'Spicy'] })
-    );
-    expect(actions[0].op).toBe('clarify');
-    expect(actions[0].options).toEqual(['Classic', 'Spicy']);
-  });
-
-  it('parses an upsell action', () => {
-    const parser = createStreamParser();
-    const { actions } = parser.processChunk(
-      action({ op: 'upsell', upsellItem: 'truffle-fries', upsellMessage: 'Try the truffle fries?' })
-    );
-    expect(actions[0].op).toBe('upsell');
-    expect(actions[0].upsellItem).toBe('truffle-fries');
-    expect(actions[0].upsellMessage).toBe('Try the truffle fries?');
-  });
-
-  it('parses a suggest action with multiple items', () => {
-    const parser = createStreamParser();
-    const { actions } = parser.processChunk(
-      action({ op: 'suggest', items: [
-        { id: 'classic-burger', name: 'Classic Bistro Burger', qty: 0, price: 14.5 },
-        { id: 'bbq-burger',     name: 'Smokehouse BBQ Burger', qty: 0, price: 16.5 },
-      ]})
-    );
-    expect(actions[0].op).toBe('suggest');
-    expect(actions[0].items).toHaveLength(2);
-    expect(actions[0].items![0].id).toBe('classic-burger');
-  });
-
-  it('parses two actions in one chunk', () => {
-    const parser = createStreamParser();
-    const chunk = [
-      action({ op: 'add', items: [{ id: 'classic-burger', name: 'Classic', qty: 1, price: 14.5 }] }),
-      action({ op: 'upsell', upsellItem: 'truffle-fries', upsellMessage: 'Try fries?' }),
-    ].join(' ');
-    const { actions } = parser.processChunk(chunk);
-    expect(actions).toHaveLength(2);
-    expect(actions[0].op).toBe('add');
-    expect(actions[1].op).toBe('upsell');
+  it('parses two actions in one event', () => {
+    const payload = {
+      type: 'actions',
+      actions: [
+        { name: 'add_item', input: { item_id: 'truffle-fries', quantity: 1 }, status: 'applied' },
+        { name: 'upsell',   input: { item_id: 'craft-cola', pitch: 'Goes well!' }, status: 'applied' },
+      ],
+    };
+    const result = parseSSEEvent(`data: ${JSON.stringify(payload)}`);
+    expect(result!.actions).toHaveLength(2);
+    expect(result!.actions![0].name).toBe('add_item');
+    expect(result!.actions![1].name).toBe('upsell');
   });
 });
 
-describe('createStreamParser — multi-chunk buffering', () => {
-  it('assembles an action split across two chunks', () => {
-    const parser   = createStreamParser();
-    const full     = action({ op: 'clear' });
-    const mid      = Math.floor(full.length / 2);
-    const { actions: a1 } = parser.processChunk(full.slice(0, mid));
-    const { actions: a2 } = parser.processChunk(full.slice(mid));
-    expect(a1).toHaveLength(0);
-    expect(a2).toHaveLength(1);
-    expect(a2[0].op).toBe('clear');
-  });
-
-  it('assembles an action split at every byte boundary', () => {
-    const parser = createStreamParser();
-    const full   = action({ op: 'clear' });
-    let allActions: any[] = [];
-    for (const c of full) {
-      const { actions } = parser.processChunk(c);
-      allActions = allActions.concat(actions);
-    }
-    expect(allActions).toHaveLength(1);
-    expect(allActions[0].op).toBe('clear');
-  });
-
-  it('produces no visible text while inside action buffer', () => {
-    const parser = createStreamParser();
-    const full   = action({ op: 'clear' });
-    const mid    = Math.floor(full.length / 2);
-    const { visibleText: v1 } = parser.processChunk(full.slice(0, mid));
-    const { visibleText: v2 } = parser.processChunk(full.slice(mid));
-    expect(v1 + v2).toBe('');
+describe('parseSSEEvent — recommendations event', () => {
+  it('parses a recommendations event', () => {
+    const payload = {
+      type: 'recommendations',
+      items: [{ item_id: 'truffle-fries', name: 'Truffle Fries', price: 8.5, image: '🍟', reason: 'Pairs well', score: 0.82, source: 'pairing' }],
+    };
+    const result = parseSSEEvent(`data: ${JSON.stringify(payload)}`);
+    expect(result!.type).toBe('recommendations');
+    expect(result!.recommendations).toHaveLength(1);
+    expect(result!.recommendations![0].item_id).toBe('truffle-fries');
+    expect(result!.recommendations![0].score).toBe(0.82);
   });
 });
 
-describe('createStreamParser — error resilience', () => {
-  it('does not throw on malformed JSON inside sentinel', () => {
-    const parser = createStreamParser();
-    expect(() => parser.processChunk(`${OPEN}not-valid-json${CLOSE}`)).not.toThrow();
-  });
-
-  it('returns no actions for malformed JSON', () => {
-    const parser = createStreamParser();
-    const { actions } = parser.processChunk(`${OPEN}{broken${CLOSE}`);
-    expect(actions).toHaveLength(0);
-  });
-
-  it('continues parsing text after malformed action', () => {
-    const parser = createStreamParser();
-    const { visibleText } = parser.processChunk(`${OPEN}{bad}${CLOSE}after`);
-    expect(visibleText).toBe('after');
+describe('parseSSEEvent — done event', () => {
+  it('parses a done event', () => {
+    const result = parseSSEEvent('data: {"type":"done"}');
+    expect(result!.type).toBe('done');
   });
 });
 
-describe('createStreamParser — reset', () => {
-  it('clears mid-stream action state on reset', () => {
-    const parser = createStreamParser();
-    const full   = action({ op: 'clear' });
-    // Start an action but don't finish it
-    parser.processChunk(full.slice(0, Math.floor(full.length / 2)));
-    parser.reset();
-    // After reset plain text must work again
-    const { visibleText, actions } = parser.processChunk('Fresh start');
-    expect(visibleText).toBe('Fresh start');
-    expect(actions).toHaveLength(0);
+describe('parseSSEEvent — error resilience', () => {
+  it('does not throw on malformed JSON', () => {
+    expect(() => parseSSEEvent('data: {not valid json')).not.toThrow();
   });
 
-  it('allows a complete action after reset', () => {
-    const parser = createStreamParser();
-    parser.processChunk('partial ✦ACTION✦{"op":"ad');
-    parser.reset();
-    const { actions } = parser.processChunk(action({ op: 'clear' }));
-    expect(actions).toHaveLength(1);
-    expect(actions[0].op).toBe('clear');
+  it('returns null for malformed JSON', () => {
+    expect(parseSSEEvent('data: {broken')).toBeNull();
+  });
+
+  it('returns null for event without type field', () => {
+    expect(parseSSEEvent('data: {"text":"no type"}')).toBeNull();
+  });
+
+  it('ignores keep-alive pings', () => {
+    expect(parseSSEEvent(':keep-alive')).toBeNull();
+  });
+
+  it('passes through unknown event types without throwing', () => {
+    expect(() => parseSSEEvent('data: {"type":"future_event","data":"x"}')).not.toThrow();
+  });
+});
+
+describe('stripSentinels — legacy sentinel removal', () => {
+  it('strips a single sentinel block', () => {
+    const text = 'Added! ✦ACTION✦{"op":"add","items":[]}✦END✦ Enjoy!';
+    expect(stripSentinels(text)).toBe('Added! Enjoy!');
+  });
+
+  it('removes only the action from text', () => {
+    const text = 'Before ✦ACTION✦{"op":"clear"}✦END✦ After';
+    const stripped = stripSentinels(text);
+    expect(stripped).not.toContain('✦ACTION✦');
+    expect(stripped).not.toContain('✦END✦');
+    expect(stripped).toContain('Before');
+    expect(stripped).toContain('After');
+  });
+
+  it('returns unchanged text if no sentinels present', () => {
+    const text = 'Here is your order summary.';
+    expect(stripSentinels(text)).toBe(text);
+  });
+
+  it('removes multiple sentinel blocks', () => {
+    const text = 'A ✦ACTION✦{1}✦END✦ B ✦ACTION✦{2}✦END✦ C';
+    const stripped = stripSentinels(text);
+    expect(stripped).not.toContain('✦ACTION✦');
+    expect(stripped).toContain('A');
+    expect(stripped).toContain('C');
   });
 });
 

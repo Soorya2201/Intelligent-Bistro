@@ -16,8 +16,12 @@ import CartSheet from '../components/Cart/CartSheet';
 import { useStreamParser } from '../hooks/useStreamParser';
 import { useVoiceInput } from '../hooks/useVoiceInput';
 import { useTTS } from '../hooks/useTTS';
-import { streamChat } from '../services/api';
+import { streamChat, fetchMenu } from '../services/api';
 import { COLORS } from '../constants/theme';
+import { extractMenuMentions } from '../utils/extractMenuMentions';
+
+// Stable session ID for this app session
+const SESSION_ID = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
 function CartHeaderButton({ onPress }: { onPress: () => void }) {
   const itemCount = useStore(s => s.getItemCount());
@@ -55,14 +59,26 @@ export default function ChatScreen() {
   const quickReplies  = useStore(s => s.quickReplies);
   const isStreaming   = useStore(s => s.isStreaming);
 
-  const addMessage                   = useStore(s => s.addMessage);
-  const setStreaming                  = useStore(s => s.setStreaming);
-  const appendToLastAssistantMessage = useStore(s => s.appendToLastAssistantMessage);
-  const addRestriction               = useStore(s => s.addRestriction);
-  const clearQuickReplies            = useStore(s => s.clearQuickReplies);
+  const addMessage                      = useStore(s => s.addMessage);
+  const setStreaming                    = useStore(s => s.setStreaming);
+  const appendToLastAssistantMessage   = useStore(s => s.appendToLastAssistantMessage);
+  const setSuggestedItemsOnLastMessage = useStore(s => s.setSuggestedItemsOnLastMessage);
+  const addRestriction                 = useStore(s => s.addRestriction);
+  const clearQuickReplies              = useStore(s => s.clearQuickReplies);
 
-  const { processChunk, reset } = useStreamParser();
+  const { processActionsEvent, processRecommendationsEvent, reset } = useStreamParser();
   const { speak, stop: stopTTS } = useTTS();
+
+  // Flat menu catalog used for mention-detection in assistant responses
+  const menuCatalogRef = useRef<Array<{ id: string; name: string; price: number; image: string }>>([]);
+  useEffect(() => {
+    fetchMenu().then(data => {
+      if (!data) return;
+      const categories: Array<{ items: Array<{ id: string; name: string; price: number; image: string }> }> =
+        data.categories ?? (Array.isArray(data) ? [{ items: data }] : []);
+      menuCatalogRef.current = categories.flatMap(c => c.items ?? []);
+    });
+  }, []);
 
   const speechRef = useRef<SpeechWebViewRef>(null);
 
@@ -70,7 +86,7 @@ export default function ChatScreen() {
     isListening, transcript, startListening, stopListening, error: voiceError,
     onSpeechResult, onSpeechEnd, onSpeechError,
   } = useVoiceInput(
-    (finalText) => { if (finalText.trim()) handleSend(finalText); },
+    (finalText) => { if (finalText.trim()) handleSend(finalText, 'voice'); },
     speechRef,
   );
 
@@ -81,11 +97,9 @@ export default function ChatScreen() {
   }, [navigation]);
 
   const waveBarHeight = useRef(new Animated.Value(0)).current;
-
-  // Pulse ring + wave bar animations
-  const pulseScale   = useRef(new Animated.Value(1)).current;
-  const pulseOpacity = useRef(new Animated.Value(0)).current;
-  const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const pulseScale    = useRef(new Animated.Value(1)).current;
+  const pulseOpacity  = useRef(new Animated.Value(0)).current;
+  const pulseLoopRef  = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     Animated.timing(waveBarHeight, {
@@ -113,8 +127,6 @@ export default function ChatScreen() {
       pulseLoopRef.current.start();
     } else {
       pulseLoopRef.current?.stop();
-      // stopAnimation callback fires after the native thread fully halts,
-      // preventing the race where setValue is overridden by an in-flight frame.
       pulseOpacity.stopAnimation(() => pulseOpacity.setValue(0));
       pulseScale.stopAnimation(() => pulseScale.setValue(1));
     }
@@ -126,15 +138,29 @@ export default function ChatScreen() {
     keywords.forEach(kw => { if (lower.includes(kw)) addRestriction(kw); });
   };
 
-  const handleSend = async (text: string) => {
+  const handleSend = async (text: string, inputMethod: 'voice' | 'text' = 'text') => {
     detectDietary(text);
-    const userMsg = { id: Date.now().toString(), role: 'user' as const, content: text, timestamp: new Date() };
+    const userMsg = {
+      id: Date.now().toString(),
+      role: 'user' as const,
+      content: text,
+      timestamp: new Date(),
+      inputMethod,
+    };
     addMessage(userMsg);
-    const astMsg  = { id: (Date.now() + 1).toString(), role: 'assistant' as const, content: '', timestamp: new Date(), isStreaming: true };
+    const astMsg = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant' as const,
+      content: '',
+      timestamp: new Date(),
+      isStreaming: true,
+    };
     addMessage(astMsg);
     setStreaming(true);
     reset();
+
     const currentMessages = [...messages, userMsg];
+
     await streamChat(
       currentMessages,
       cartItems,
@@ -142,21 +168,35 @@ export default function ChatScreen() {
         restrictions: profile.restrictions,
         likedItems: profile.likedItems.map(i => ({ id: i.id, name: i.name, price: i.price })),
       },
-      (chunk) => {
-        const { visibleText } = processChunk(chunk);
-        if (visibleText) appendToLastAssistantMessage(visibleText);
+      {
+        onActions: (actions) => {
+          processActionsEvent(actions);
+        },
+        onDelta: (text) => {
+          appendToLastAssistantMessage(text);
+        },
+        onRecommendations: (items) => {
+          processRecommendationsEvent(items);
+        },
+        onDone: () => {
+          setStreaming(false);
+          const latest = useStore.getState().messages;
+          const last   = latest[latest.length - 1];
+          if (last?.role === 'assistant' && last.content) {
+            speak(last.content);
+            if (menuCatalogRef.current.length > 0) {
+              const mentions = extractMenuMentions(last.content, menuCatalogRef.current);
+              if (mentions.length > 0) setSuggestedItemsOnLastMessage(mentions);
+            }
+          }
+        },
+        onError: (err) => {
+          console.error('Stream error:', err);
+          appendToLastAssistantMessage('\n[Error: could not reach server]');
+          setStreaming(false);
+        },
       },
-      () => {
-        setStreaming(false);
-        const latest = useStore.getState().messages;
-        const last   = latest[latest.length - 1];
-        if (last?.role === 'assistant') speak(last.content);
-      },
-      (err) => {
-        console.error('Stream error:', err);
-        appendToLastAssistantMessage('\n[Error: could not reach server]');
-        setStreaming(false);
-      }
+      SESSION_ID,
     );
   };
 
@@ -164,12 +204,12 @@ export default function ChatScreen() {
     const t = textInput.trim();
     if (!t || isStreaming) return;
     setTextInput('');
-    handleSend(t);
+    handleSend(t, 'text');
   };
 
   const handleQuickReply = (reply: string) => {
     clearQuickReplies();
-    handleSend(reply);
+    handleSend(reply, 'text');
   };
 
   const toggleMic = () => {
@@ -177,7 +217,6 @@ export default function ChatScreen() {
     else { stopTTS(); startListening(); }
   };
 
-  // What to display in the text input
   const inputDisplayValue = isListening ? transcript : textInput;
   const inputPlaceholder  = isListening
     ? 'Listening…'
@@ -235,7 +274,14 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Unified text input — shows transcript when listening */}
+            {/* Input mode indicator when listening */}
+            {isListening && (
+              <View style={styles.listeningBadge}>
+                <Feather name="mic" size={10} color={COLORS.bistroGold} />
+                <Text style={styles.listeningBadgeText}>Voice</Text>
+              </View>
+            )}
+
             <TextInput
               style={[styles.textInput, isListening && styles.textInputRecording]}
               placeholder={inputPlaceholder}
@@ -248,14 +294,12 @@ export default function ChatScreen() {
               multiline
             />
 
-            {/* Stop button — visible only while listening */}
             {isListening && (
               <TouchableOpacity style={styles.stopBtn} onPress={stopListening}>
                 <Feather name="square" size={14} color={COLORS.bistroBrown} />
               </TouchableOpacity>
             )}
 
-            {/* Send button — visible only when not listening */}
             {!isListening && (
               <TouchableOpacity
                 onPress={handleTextSend}
@@ -316,6 +360,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35, shadowRadius: 6, elevation: 4,
   },
   micBtnActive: { backgroundColor: COLORS.danger, shadowColor: COLORS.danger },
+  listeningBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#fffdf0', borderRadius: 12,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 0.5, borderColor: COLORS.bistroGold,
+  },
+  listeningBadgeText: { fontSize: 10, color: COLORS.bistroGold, fontWeight: '600' },
   textInput: {
     flex: 1,
     backgroundColor: COLORS.card, borderRadius: 24,

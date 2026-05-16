@@ -5,8 +5,12 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import MenuGrid from '../components/Menu/MenuGrid';
 import CartSheet from '../components/Cart/CartSheet';
+import RecommendationStrip from '../components/Menu/RecommendationStrip';
 import { useStore } from '../store';
 import { COLORS } from '../constants/theme';
+
+// Stable session ID shared with ChatScreen
+const SESSION_ID = `session_home_${Date.now()}`;
 
 export default function HomeScreen() {
   const navigation   = useNavigation<any>();
@@ -63,6 +67,9 @@ export default function HomeScreen() {
         </View>
         <Text style={styles.sub}>Tap + to add · Or chat to order</Text>
       </Animated.View>
+
+      {/* Recommendation Strip */}
+      <RecommendationStrip sessionId={SESSION_ID} label="For You" />
 
       {/* Menu */}
       <MenuGrid />

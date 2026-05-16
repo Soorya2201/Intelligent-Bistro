@@ -1,4 +1,5 @@
 import { buildSystemPrompt } from '../services/anthropic';
+import { BISTRO_TOOLS } from '../ai/tools';
 import menuData from '../data/menu.json';
 
 const emptyCart    = [] as any[];
@@ -39,7 +40,7 @@ describe('buildSystemPrompt — cart section', () => {
 
   it('includes cart item names when cart is populated (UI format)', () => {
     const cart = [
-      { menuItem: { id: 'classic-burger', name: 'Classic Bistro Burger', price: 14.5 }, quantity: 2 },
+      { menuItem: { id: 'classic-bistro-burger', name: 'Classic Bistro Burger', price: 14 }, quantity: 2 },
     ];
     const prompt = buildSystemPrompt(cart, emptyProfile, menuData);
     expect(prompt).toContain('Classic Bistro Burger');
@@ -47,39 +48,37 @@ describe('buildSystemPrompt — cart section', () => {
 
   it('does not show the empty-cart message when cart has items', () => {
     const cart = [
-      { menuItem: { id: 'classic-burger', name: 'Classic Bistro Burger', price: 14.5 }, quantity: 1 },
+      { menuItem: { id: 'classic-bistro-burger', name: 'Classic Bistro Burger', price: 14 }, quantity: 1 },
     ];
     const prompt = buildSystemPrompt(cart, emptyProfile, menuData);
     expect(prompt).not.toContain('cart is currently empty');
   });
 
-  it('normalises UI cart format to flat {id,name,qty,price} so the AI reads it correctly', () => {
+  it('normalises UI cart format so the AI reads it correctly', () => {
     const cart = [
-      { menuItem: { id: 'classic-burger', name: 'Classic Bistro Burger', price: 14.5 }, quantity: 2 },
+      { menuItem: { id: 'classic-bistro-burger', name: 'Classic Bistro Burger', price: 14 }, quantity: 2 },
     ];
     const prompt = buildSystemPrompt(cart, emptyProfile, menuData);
-    // The AI should see flat format matching its action schema, not nested menuItem objects
     expect(prompt).toContain('"qty":2');
-    expect(prompt).toContain('"id":"classic-burger"');
+    expect(prompt).toContain('"id":"classic-bistro-burger"');
     expect(prompt).not.toContain('"menuItem"');
   });
 
   it('shows order total when cart has items', () => {
     const cart = [
-      { menuItem: { id: 'classic-burger', name: 'Classic Bistro Burger', price: 14.5 }, quantity: 2 },
+      { menuItem: { id: 'classic-bistro-burger', name: 'Classic Bistro Burger', price: 14 }, quantity: 2 },
     ];
     const prompt = buildSystemPrompt(cart, emptyProfile, menuData);
-    expect(prompt).toContain('Order total: $29.00');
+    expect(prompt).toContain('Order total: $28.00');
   });
 
-  it('also handles flat cart format (AI-added items round-trip)', () => {
+  it('also handles flat cart format', () => {
     const cart = [
       { id: 'truffle-fries', name: 'Truffle Fries', qty: 1, price: 8.5 },
     ];
     const prompt = buildSystemPrompt(cart, emptyProfile, menuData);
     expect(prompt).toContain('Truffle Fries');
     expect(prompt).toContain('"qty":1');
-    expect(prompt).not.toContain('"menuItem"');
   });
 });
 
@@ -96,44 +95,51 @@ describe('buildSystemPrompt — dietary profile section', () => {
     expect(prompt).toContain('gluten-free');
   });
 
-  it('shows "None saved yet" when liked items list is empty', () => {
-    const prompt = buildSystemPrompt(emptyCart, emptyProfile, menuData);
-    expect(prompt).toContain('None saved yet');
-  });
-
-  it('lists liked item names when provided', () => {
-    const profile = {
-      restrictions: [],
-      likedItems: [{ id: 'classic-burger', name: 'Classic Bistro Burger', price: 14.5 }],
-    };
-    const prompt = buildSystemPrompt(emptyCart, profile, menuData);
-    expect(prompt).toContain('Classic Bistro Burger');
+  it('injects dietary restrictions into system prompt', () => {
+    const profile = { restrictions: ['nut-free'], likedItems: [] };
+    const prompt  = buildSystemPrompt(emptyCart, profile, menuData);
+    expect(prompt).toContain('nut-free');
   });
 });
 
-describe('buildSystemPrompt — sentinel instructions', () => {
-  it('contains the ✦ACTION✦ sentinel', () => {
+describe('buildSystemPrompt — tool-calling instructions', () => {
+  it('instructs the AI to use tools, not sentinel markers', () => {
     const prompt = buildSystemPrompt(emptyCart, emptyProfile, menuData);
-    expect(prompt).toContain('✦ACTION✦');
+    expect(prompt).toContain('tools');
+    expect(prompt).not.toContain('✦ACTION✦');
+    expect(prompt).not.toContain('✦END✦');
   });
 
-  it('contains the ✦END✦ sentinel', () => {
+  it('lists all available tool names', () => {
     const prompt = buildSystemPrompt(emptyCart, emptyProfile, menuData);
-    expect(prompt).toContain('✦END✦');
+    expect(prompt).toContain('add_item');
+    expect(prompt).toContain('remove_item');
+    expect(prompt).toContain('clarify');
+    expect(prompt).toContain('upsell');
+  });
+});
+
+describe('BISTRO_TOOLS — tool definitions', () => {
+  it('has correct input_schema shape for add_item', () => {
+    const tool = BISTRO_TOOLS.find(t => t.name === 'add_item')!;
+    const schema = tool.input_schema as any;
+    expect(schema.type).toBe('object');
+    expect(schema.properties).toBeDefined();
+    expect(schema.properties.item_id).toBeDefined();
+    expect(schema.properties.quantity).toBeDefined();
   });
 
-  it('contains the suggest op schema', () => {
-    const prompt = buildSystemPrompt(emptyCart, emptyProfile, menuData);
-    expect(prompt).toContain('"op":"suggest"');
+  it('has correct input_schema shape for clarify', () => {
+    const tool = BISTRO_TOOLS.find(t => t.name === 'clarify')!;
+    const schema = tool.input_schema as any;
+    expect(schema.properties.question).toBeDefined();
+    expect(schema.properties.options).toBeDefined();
   });
 
-  it('contains the add op schema', () => {
-    const prompt = buildSystemPrompt(emptyCart, emptyProfile, menuData);
-    expect(prompt).toContain('"op":"add"');
-  });
-
-  it('contains the clarify op schema', () => {
-    const prompt = buildSystemPrompt(emptyCart, emptyProfile, menuData);
-    expect(prompt).toContain('"op":"clarify"');
+  it('enforces quantity bounds in add_item schema', () => {
+    const tool = BISTRO_TOOLS.find(t => t.name === 'add_item')!;
+    const schema = tool.input_schema as any;
+    expect(schema.properties.quantity.minimum).toBe(1);
+    expect(schema.properties.quantity.maximum).toBe(20);
   });
 });

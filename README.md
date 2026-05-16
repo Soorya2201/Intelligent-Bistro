@@ -3,7 +3,7 @@
 > **A full-stack AI-powered food ordering experience — order by voice, text, or tap.**
 
 ![CI](https://github.com/Soorya2201/Intelligent-Bistro/actions/workflows/ci.yml/badge.svg)
-![Tests](https://img.shields.io/badge/tests-105%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-150%20passing-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)
 ![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20Web-lightgrey)
 
@@ -11,15 +11,15 @@
 
 ## What is this?
 
-Intelligent Bistro replaces the traditional tap-through food ordering UI with a **conversational AI waiter**. Users speak or type naturally — the AI parses intent, updates the cart in real time, handles edge cases like ambiguity and dietary conflicts, and reads its responses aloud.
+Intelligent Bistro replaces the traditional tap-through food ordering UI with a **conversational AI waiter**. Users speak or type naturally — the AI parses intent, updates the cart in real time via native tool-calling, handles dietary conflicts and ambiguity, and reads its responses aloud.
 
-It is a production-grade monorepo with a React Native mobile app, a Node.js streaming backend, real voice I/O, a custom streaming protocol, and a full unit test suite with CI.
+It is a production-grade monorepo with a React Native mobile app, a Node.js streaming backend, SQLite persistence, a multi-signal recommendation engine, real voice I/O, and a 150-test suite with CI.
 
 ---
 
 ## See It In Action
 
-### The AI Conversation — Web
+### The AI Conversation 
 
 <div align="center">
   <img src="assets/Desktop-Screenshot_1.png" width="49%" alt="AI answering price queries and building the cart"/>
@@ -48,7 +48,7 @@ It is a production-grade monorepo with a React Native mobile app, a Node.js stre
 
 | Browse Burgers | Browse Sides | Live Cart | Checkout | Confirmed | History |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| Category tabs + rich food photography | Dietary tags on every item | Pairing chips, running total | AI-narrated itemised receipt | Order placed | Favourites + full order history |
+| Category tabs + real food photography | Dietary tags on every item | Pairing chips, running total | AI-narrated itemised receipt | 4-stage order animation | Favourites + full order history |
 
 </div>
 
@@ -57,22 +57,56 @@ It is a production-grade monorepo with a React Native mobile app, a Node.js stre
 ## Core Features
 
 ### 🤖 Conversational AI Ordering
-Say *"Add two spicy chicken sandwiches, remove the fries, and make it a combo"* — the AI parses the entire sentence and updates the cart with a single response. No button tapping required.
+Say *"Add two spicy chicken sandwiches, remove the fries, and make it a combo"* — the AI resolves intent through **native Claude tool-calling** and updates the cart atomically before streaming its reply. No button tapping required.
+
+### 🛠️ Native Tool-Calling (Two-Phase Streaming)
+The backend runs two Claude passes per message:
+1. **Phase 1** — non-streaming, `tool_choice: auto`. Claude calls tools (`add_item`, `remove_item`, `update_quantity`, `clear_cart`, `clarify`, `suggest_pairing`, `upsell`) to mutate the cart atomically.
+2. **Phase 2** — streaming, `tool_choice: none`. Claude narrates what it just did in natural language, streamed token-by-token to the client.
+
+This separates cart mutations (which must be atomic) from conversational text (which benefits from streaming).
 
 ### 🎙️ End-to-End Voice I/O
 - **Speech-to-text** via Groq's Whisper API (`whisper-large-v3-turbo`) — fast, accurate, free tier
 - **Text-to-speech** via `expo-speech` — AI responses are spoken aloud, emoji-stripped automatically
 - Live waveform animation and pulse ring give clear visual feedback while recording
+- Voice messages get a distinct visual tint and mic indicator in chat
 
 ### ⚡ Real-Time Streaming
-The backend streams responses token-by-token over **Server-Sent Events**. Text appears character-by-character as the AI thinks — no waiting for a full response.
+The backend streams responses token-by-token over **Server-Sent Events**. Structured events carry typed payloads:
+```json
+{ "type": "actions",         "actions": [...] }
+{ "type": "delta",           "text": "Great choice! " }
+{ "type": "recommendations", "items": [...] }
+{ "type": "done" }
+```
 
-### 🧩 Custom Sentinel Protocol
-Structured cart actions are embedded inside natural language using Unicode delimiters:
-```
-"I've added that! ✦ACTION✦{"op":"add","items":[{"id":"spicy-chicken","qty":2,"price":13.50}]}✦END✦ Great choice!"
-```
-The stream parser strips actions from visible text and dispatches them to the cart store **while the response is still streaming**. Supports 7 operations: `add`, `remove`, `update`, `clear`, `clarify`, `upsell`, `suggest`.
+### 🗄️ SQLite Persistence
+All data is persisted in a local SQLite database (`better-sqlite3`, WAL mode):
+- **6 tables** — `menu_items`, `orders`, `order_items`, `sessions`, `interactions`, `popularity`
+- Seeded from `menu.json` at startup (idempotent)
+- Order history survives server restarts
+
+### 💡 Multi-Signal Recommendation Engine
+Every response optionally includes personalised item recommendations, scored across 4 signals:
+
+| Signal | Weight | Source |
+|---|---|---|
+| Popularity | 25% | Global interaction counts in SQLite |
+| Affinity | 35% | Session-level liked/ordered items |
+| Pairing | 25% | Per-item pairing graph in menu.json |
+| Dietary fit | 15% | User's active restrictions |
+
+Recommendations are skipped on repeated calls with the same cart fingerprint to avoid redundant API work.
+
+### 📸 Real Food Photography
+Every menu item has a real food photo. A centralised image map (`constants/menuImages.ts`) is the single source of truth — all card components (`MenuCard`, `MenuMicroTile`, `RecommendationCard`, `RecommendationStrip`) import from it. Items without photos were removed from the menu.
+
+### 🃏 Inline Chat Item Cards
+When the AI lists food items in its response (e.g. *"Here are our burgers: **Wagyu Smash Burger**..."*), the app detects the mentions and renders tappable `MenuMicroTile` cards directly below the bubble — tap to add to cart instantly.
+
+### 🔍 AI Tool Inspector
+Long-press any action chip on an assistant message to see a developer panel showing the exact tool name, input payload, and apply/reject status — useful for debugging and demos.
 
 ### 🛒 Smart Cart
 - Add, remove, update quantities — via AI or the tap UI
@@ -81,22 +115,13 @@ The stream parser strips actions from visible text and dispatches them to the ca
 - Swipe-to-delete in the cart sheet
 
 ### 🥗 Dietary Intelligence
-Tell Bistro *"I'm vegan"* or *"no nuts"* once — it remembers for the session and warns you before adding any conflicting item: *"Hey, just so you know, that contains dairy — want me to add it anyway?"*
+Tell Bistro *"I'm vegan"* or *"no nuts"* once — it remembers for the session and warns you before adding any conflicting item.
 
-### 💡 Upsells & Clarification
-- Ambiguous orders trigger a `clarify` action with quick-reply chips
-- After adding an item, Bistro naturally suggests a pairing: *"Most customers grab the truffle fries with it!"*
-- Visual food card tiles appear inside the chat when browsing recommendations
+### 📋 4-Stage Checkout Animation
+Order confirmation runs a live progress tracker through four stages (Received → Kitchen → Almost Ready → Ready for Pickup) with an animated progress bar, stage dots, and a confetti celebration at the end.
 
-### 📋 Checkout Narration
-Before confirming, Bistro reads your entire order back to you conversationally — powered by the same streaming pipeline, so it streams in real time too.
-
-### 📱 Polished UI
-- Warm bistro-themed design system (custom colour tokens, spacing, radius constants)
-- `react-native-reanimated` animations throughout — spring physics, fade-ins, wave bars
-- `@shopify/flash-list` for buttery-smooth menu grid rendering
-- Category tab bar with icon + label for quick browsing
-- Full keyboard-avoiding layout with safe-area handling
+### 📧 Email Receipts
+Opt in at checkout to receive a branded HTML receipt by email. Powered by nodemailer + Gmail SMTP — gracefully skipped in demo mode if SMTP credentials are not configured.
 
 ---
 
@@ -108,9 +133,11 @@ Before confirming, Bistro reads your entire order back to you conversationally �
 | Language | TypeScript (strict) | End-to-end type safety |
 | State | Zustand | Minimal, composable slices |
 | Backend | Node.js + Express | Lightweight, SSE-native |
-| AI | Anthropic Claude (`claude-sonnet-4-5`) | Best-in-class instruction following |
-| Voice STT | Groq Whisper | 2,000 min/day free, <1s latency |
+| AI | Anthropic Claude (`claude-sonnet-4-6`) | Native tool-calling, best-in-class instruction following |
+| Voice STT | Groq Whisper | 2,000 min/day free, <1 s latency |
 | Voice TTS | `expo-speech` | Native on-device, no API cost |
+| Database | SQLite (`better-sqlite3`) | Zero-config, WAL mode, fast reads |
+| Email | nodemailer + Gmail SMTP | Optional receipts, zero infra cost |
 | Navigation | React Navigation v7 | NativeStack + Tab navigator |
 | Monorepo | Turborepo + npm workspaces | Parallel builds, shared config |
 | CI | GitHub Actions | Tests on every push |
@@ -120,29 +147,36 @@ Before confirming, Bistro reads your entire order back to you conversationally �
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│                 Expo App                    │
-│                                             │
-│  ChatScreen                                 │
-│    ├── useVoiceInput  ──► Groq /transcribe  │
-│    ├── useStreamParser ◄── SSE chunks       │
-│    ├── useStore (Zustand)                   │
-│    │     ├── cartSlice                      │
-│    │     ├── chatSlice                      │
-│    │     └── profileSlice                   │
-│    └── useTTS  ──► expo-speech              │
-│                                             │
-│  HomeScreen ──► MenuGrid (FlashList)        │
-│  CheckoutScreen ──► OrderRecap              │
-└──────────────┬──────────────────────────────┘
-               │ XHR / SSE  (LAN or tunnel)
-┌──────────────▼──────────────────────────────┐
-│              Node.js API (port 3001)         │
-│                                             │
-│  POST /chat  ──► Claude (streaming)         │
-│  POST /transcribe ──► Groq Whisper          │
-│  GET  /menu  ──► menu.json                  │
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│                      Expo App                       │
+│                                                     │
+│  ChatScreen                                         │
+│    ├── useVoiceInput  ──► Groq /transcribe           │
+│    ├── useStreamParser ◄── SSE (actions/delta/recs) │
+│    ├── useStore (Zustand)                           │
+│    │     ├── cartSlice                              │
+│    │     ├── chatSlice                              │
+│    │     └── profileSlice  (restrictions, email)    │
+│    └── useTTS  ──► expo-speech                      │
+│                                                     │
+│  HomeScreen ──► MenuGrid + RecommendationStrip      │
+│  CheckoutScreen ──► 4-stage animation + email opt-in│
+└──────────────────┬──────────────────────────────────┘
+                   │ XHR / SSE  (LAN or tunnel)
+┌──────────────────▼──────────────────────────────────┐
+│              Node.js API (port 3001)                │
+│                                                     │
+│  POST /chat                                         │
+│    ├── Phase 1: tool-calling  ──► Claude (sync)     │
+│    └── Phase 2: narration     ──► Claude (stream)   │
+│                                                     │
+│  GET  /menu              ──► SQLite menu_items      │
+│  POST /api/orders        ──► SQLite orders          │
+│                               + nodemailer receipt  │
+│  GET  /api/recommendations ──► 4-signal scorer      │
+│                                                     │
+│  SQLite (WAL) ── seeded from menu.json at startup   │
+└─────────────────────────────────────────────────────┘
 ```
 
 ### Why XHR instead of fetch for SSE?
@@ -157,19 +191,24 @@ Intelligent-Bistro/
 ├── apps/
 │   ├── api/
 │   │   ├── src/
-│   │   │   ├── routes/        # chat, menu, transcribe
-│   │   │   ├── services/      # Anthropic client + system prompt
+│   │   │   ├── ai/            # Tool schemas (Zod) + validateToolInput
+│   │   │   ├── db/            # SQLite init, seed, repositories
+│   │   │   ├── routes/        # chat, menu, orders, recommendations
+│   │   │   ├── services/      # anthropic client, recommendations, mailer, metrics
 │   │   │   └── data/          # menu.json (single source of truth)
 │   │   └── src/__tests__/     # API unit tests
 │   └── mobile/
 │       ├── src/
 │       │   ├── screens/       # Home, Chat, Checkout, Profile
 │       │   ├── components/    # Cart, Chat, Menu, Checkout UI
+│       │   ├── constants/     # theme, menuImages (centralised photo map)
 │       │   ├── hooks/         # useStreamParser, useVoiceInput, useTTS
-│       │   ├── store/         # Zustand slices
+│       │   ├── store/         # Zustand slices (cart, chat, profile, orderHistory)
 │       │   ├── types/         # Shared TypeScript interfaces
-│       │   └── utils/         # streamParser (pure, testable)
+│       │   ├── utils/         # streamParser, extractMenuMentions
+│       │   └── services/      # api.ts (streamChat, fetchMenu, placeOrder)
 │       └── src/**/__tests__/  # Mobile unit tests
+├── assets/                    # Food photography (23 items)
 ├── .github/workflows/ci.yml   # GitHub Actions CI
 └── package.json               # Root workspace
 ```
@@ -178,16 +217,18 @@ Intelligent-Bistro/
 
 ## Test Suite
 
-**105 tests across 6 suites — all passing.**
+**150 tests across 8 suites — all passing.**
 
 | Suite | Tests | What it covers |
 |---|---|---|
+| `tools.test.ts` | 35 | Tool schemas, Zod validation, input edge cases |
 | `menu.schema.test.ts` | 12 | Menu JSON structure, required fields, price validity |
-| `anthropic.test.ts` | 20 | System prompt generation, cart/profile injection, format normalisation |
-| `streamParser.test.ts` | 18 | Sentinel parsing, split-chunk edge cases, malformed JSON |
+| `anthropic.test.ts` | 18 | System prompt generation, cart/profile injection |
+| `streamParser.test.ts` | 22 | Structured SSE parsing, split-chunk edge cases |
 | `cartSlice.test.ts` | 22 | Add, remove, update, clear, quantity merge, totals |
 | `chatSlice.test.ts` | 19 | Message append, streaming state, quick replies |
-| `profileSlice.test.ts` | 14 | Dietary restrictions, liked items, toggles |
+| `profileSlice.test.ts` | 14 | Dietary restrictions, liked items, email, toggles |
+| `recommendations.test.ts` | 8 | Scoring logic, cart fingerprinting, dietary filter |
 
 ---
 
@@ -197,6 +238,7 @@ Intelligent-Bistro/
 - Node.js 20+
 - An [Anthropic API key](https://console.anthropic.com)
 - A [Groq API key](https://console.groq.com) *(free — 2,000 min/day)*
+- *(Optional)* A Gmail App Password for email receipts
 
 ### Setup
 
@@ -206,9 +248,14 @@ cd Intelligent-Bistro
 npm install
 
 cp apps/api/.env.example apps/api/.env
-# Fill in apps/api/.env:
+# Required:
 #   ANTHROPIC_API_KEY=your_key
 #   GROQ_API_KEY=your_key
+#
+# Optional (email receipts):
+#   SMTP_USER=you@gmail.com
+#   SMTP_PASS=your_16char_app_password
+#   SMTP_FROM="Intelligent Bistro <noreply@bistro.app>"
 ```
 
 ### Run
@@ -232,8 +279,8 @@ cd apps/mobile && npx expo start --lan --clear
 ### Run Tests
 
 ```bash
-cd apps/api    && npm test    # 29 tests
-cd apps/mobile && npm test    # 73 tests
+cd apps/api    && npm test
+cd apps/mobile && npm test
 ```
 
 ---
@@ -242,11 +289,14 @@ cd apps/mobile && npm test    # 73 tests
 
 | Decision | Rationale |
 |---|---|
-| Sentinel protocol over function calling | Lets the AI mix natural language and structured actions in a single stream with no extra round-trip |
-| XHR over fetch for SSE | `fetch` streaming is broken on Android Hermes — XHR `onprogress` is the only reliable option |
+| Native tool-calling over sentinel protocol | Atomic, validated cart mutations with no stream-parsing fragility; Zod schemas catch bad AI output before it reaches the store |
+| Two-phase streaming | Separating tool resolution (synchronous, atomic) from narration (streaming) avoids the AI second-guessing its own tool calls mid-stream |
+| XHR over fetch for SSE | `fetch` streaming is broken on Android Hermes — XHR `onprogress` is the only reliable cross-platform option |
+| SQLite over in-memory state | Persistence across server restarts; enables real popularity tracking and order history |
+| Centralised `menuImages.ts` | Single `require()` map imported by all card components — adding a photo is a one-line change |
+| Email receipts via nodemailer | Zero infra cost; gracefully no-ops without SMTP config so demo mode works out of the box |
 | Zustand over Redux | Slice composition without boilerplate; selector-based re-renders out of the box |
 | Groq Whisper over OpenAI | 10× faster cold start, free tier sufficient for demos and development |
-| Pure `createStreamParser` utility | Decoupled from React so it can be unit-tested without a DOM or native environment |
 
 ---
 

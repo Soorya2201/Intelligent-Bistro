@@ -3,10 +3,14 @@ export interface MenuItem {
   name: string;
   price: number;
   description: string;
-  dietary: string[];
+  dietary?: string[];
+  tags?: string[];
+  allergens?: string[];
   pairings: string[];
   image: string;
   category?: string;
+  calories?: number;
+  popular?: boolean;
 }
 
 export interface CartItem {
@@ -27,6 +31,23 @@ export interface SuggestedItem {
   image: string;
 }
 
+export interface RecommendationItem {
+  item_id: string;
+  name: string;
+  price: number;
+  image: string;
+  reason: string;
+  score: number;
+  source: string;
+}
+
+export interface ToolCallRecord {
+  name: string;
+  input: Record<string, unknown>;
+  status: 'applied' | 'rejected';
+  rejectionReason?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -34,6 +55,9 @@ export interface ChatMessage {
   timestamp: Date;
   isStreaming?: boolean;
   suggestedItems?: SuggestedItem[];
+  recommendations?: RecommendationItem[];
+  toolCalls?: ToolCallRecord[];
+  inputMethod?: 'voice' | 'text';
 }
 
 export interface UserProfile {
@@ -42,6 +66,7 @@ export interface UserProfile {
   name?: string;
 }
 
+// Legacy sentinel-based action types (kept for compatibility)
 export type ActionOp = 'add' | 'remove' | 'update' | 'clear' | 'upsell' | 'clarify' | 'suggest';
 
 export interface CartAction {

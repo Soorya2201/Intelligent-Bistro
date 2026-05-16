@@ -1,81 +1,118 @@
 {
   "categories": [
     {
-      "id": "burgers",
-      "name": "Burgers",
+      "id": "starters",
+      "name": "Starters",
       "items": [
         {
-          "id": "classic-burger",
-          "name": "Classic Bistro Burger",
-          "price": 14.5,
-          "description": "8oz beef patty, lettuce, tomato, bistro sauce",
-          "dietary": [
-            "gluten"
-          ],
-          "pairings": [
-            "truffle-fries",
-            "classic-soda"
-          ],
-          "image": "\ud83c\udf54"
+          "id": "tuna-tartare",
+          "name": "Tuna Tartare",
+          "price": 12.00,
+          "description": "Sashimi-grade tuna, avocado, sesame, crispy wontons",
+          "category": "starters",
+          "allergens": ["Fish", "Soy", "Gluten"],
+          "tags": ["gluten-free"],
+          "pairings": ["sparkling-water"],
+          "calories": 220,
+          "popular": false,
+          "image": "🐟"
         },
         {
-          "id": "spicy-chicken",
+          "id": "chicken-wings",
+          "name": "Buffalo Chicken Wings",
+          "price": 11.50,
+          "description": "Crispy wings, buffalo sauce, blue cheese dip, celery",
+          "category": "starters",
+          "allergens": ["Dairy", "Gluten"],
+          "tags": ["spicy"],
+          "pairings": ["craft-cola", "classic-bistro-burger"],
+          "calories": 520,
+          "popular": true,
+          "image": "🍗"
+        }
+      ]
+    },
+    {
+      "id": "mains",
+      "name": "Mains",
+      "items": [
+        {
+          "id": "spicy-chicken-sandwich",
           "name": "Spicy Chicken Sandwich",
-          "price": 13.0,
-          "description": "Crispy chicken, jalape\u00f1os, sriracha mayo",
-          "dietary": [
-            "gluten",
-            "spicy"
-          ],
-          "pairings": [
-            "sweet-potato-fries",
-            "lemonade"
-          ],
-          "image": "\ud83c\udf36\ufe0f"
+          "price": 13.50,
+          "description": "Crispy chicken thigh, jalapeños, sriracha mayo, brioche bun",
+          "category": "mains",
+          "allergens": ["Gluten", "Eggs", "Dairy"],
+          "tags": ["spicy", "popular"],
+          "pairings": ["sweet-potato-fries", "fresh-lemonade", "craft-cola"],
+          "calories": 680,
+          "popular": true,
+          "image": "🌶️"
         },
         {
-          "id": "mushroom-burger",
-          "name": "Mushroom Swiss Burger",
-          "price": 15.0,
-          "description": "Portobello mushroom, swiss cheese, garlic aioli",
-          "dietary": [
-            "gluten",
-            "vegetarian"
-          ],
-          "pairings": [
-            "truffle-fries",
-            "iced-tea"
-          ],
-          "image": "\ud83c\udf44"
+          "id": "classic-bistro-burger",
+          "name": "Classic Bistro Burger",
+          "price": 14.00,
+          "description": "8oz beef patty, lettuce, tomato, bistro sauce, brioche bun",
+          "category": "mains",
+          "allergens": ["Gluten", "Eggs", "Dairy"],
+          "tags": ["popular"],
+          "pairings": ["truffle-fries", "craft-cola", "onion-rings"],
+          "calories": 720,
+          "popular": true,
+          "image": "🍔"
         },
         {
-          "id": "vegan-burger",
-          "name": "Beyond Bistro Burger",
-          "price": 16.0,
-          "description": "Plant-based patty, avocado, vegan mayo",
-          "dietary": [
-            "vegan",
-            "gluten"
-          ],
-          "pairings": [
-            "side-salad",
-            "sparkling-water"
-          ],
-          "image": "\ud83c\udf31"
+          "id": "wagyu-smash-burger",
+          "name": "Wagyu Smash Burger",
+          "price": 18.00,
+          "description": "Double wagyu smash patties, American cheese, caramelised onions, special sauce",
+          "category": "mains",
+          "allergens": ["Gluten", "Dairy", "Eggs"],
+          "tags": ["popular"],
+          "pairings": ["truffle-fries", "root-beer-float"],
+          "calories": 890,
+          "popular": true,
+          "image": "🥩"
         },
         {
-          "id": "bbq-burger",
-          "name": "Smokehouse BBQ Burger",
-          "price": 16.5,
-          "description": "Smoked beef patty, aged cheddar, crispy onion straws, tangy BBQ sauce",
-          "dietary": [
-            "gluten"
-          ],
-          "pairings": [
-            "truffle-fries",
-            "classic-soda"
-          ],
-          "image": "\ud83e\udd69"
+          "id": "truffle-mushroom-burger",
+          "name": "Truffle Mushroom Burger",
+          "price": 16.00,
+          "description": "Portobello mushroom, truffle aioli, Swiss cheese, arugula",
+          "category": "mains",
+          "allergens": ["Gluten", "Dairy", "Eggs"],
+          "tags": ["vegetarian"],
+          "pairings": ["truffle-fries", "iced-tea"],
+          "calories": 640,
+          "popular": false,
+          "image": "🍄"
+        },
+        {
+          "id": "veggie-grain-bowl",
+          "name": "Veggie Grain Bowl",
+          "price": 13.00,
+          "description": "Roasted seasonal vegetables, quinoa, tahini dressing, pickled red onion",
+          "category": "mains",
+          "allergens": ["Soy"],
+          "tags": ["vegan", "gluten-free"],
+          "pairings": ["still-water", "fresh-lemonade"],
+          "calories": 420,
+          "popular": false,
+          "image": "🥙"
+        },
+        {
+          "id": "bbq-pulled-pork",
+          "name": "BBQ Pulled Pork Sandwich",
+          "price": 14.50,
+          "description": "12-hour smoked pulled pork, smoky BBQ sauce, brioche bun, house coleslaw",
+          "category": "mains",
+          "allergens": ["Gluten"],
+          "tags": [],
+          "pairings": ["coleslaw", "sweet-potato-fries", "craft-cola"],
+          "calories": 760,
+          "popular": false,
+          "image": "🥪"
         }
       ]
     },
@@ -85,51 +122,81 @@
       "items": [
         {
           "id": "truffle-fries",
-          "name": "Truffle Fries",
-          "price": 8.5,
-          "description": "Hand-cut fries, truffle oil, parmesan",
-          "dietary": [
-            "vegetarian",
-            "gluten-free"
-          ],
-          "pairings": [],
-          "image": "\ud83c\udf5f"
+          "name": "Truffle Parmesan Fries",
+          "price": 8.50,
+          "description": "Hand-cut fries, black truffle oil, aged parmesan, sea salt",
+          "category": "sides",
+          "allergens": ["Dairy"],
+          "tags": ["vegetarian", "popular"],
+          "pairings": ["classic-bistro-burger", "wagyu-smash-burger"],
+          "calories": 380,
+          "popular": true,
+          "image": "🍟"
         },
         {
           "id": "sweet-potato-fries",
           "name": "Sweet Potato Fries",
-          "price": 7.5,
-          "description": "Crispy sweet potato, chipotle dip",
-          "dietary": [
-            "vegan",
-            "gluten-free"
-          ],
-          "pairings": [],
-          "image": "\ud83c\udf60"
+          "price": 7.00,
+          "description": "Crispy sweet potato fries, chipotle dipping sauce",
+          "category": "sides",
+          "allergens": [],
+          "tags": ["vegan"],
+          "pairings": ["spicy-chicken-sandwich", "bbq-pulled-pork"],
+          "calories": 310,
+          "popular": false,
+          "image": "🍠"
         },
         {
-          "id": "side-salad",
-          "name": "Garden Side Salad",
-          "price": 6.0,
-          "description": "Mixed greens, cherry tomato, balsamic",
-          "dietary": [
-            "vegan",
-            "gluten-free"
-          ],
-          "pairings": [],
-          "image": "\ud83e\udd57"
+          "id": "caesar-side",
+          "name": "Side Caesar Salad",
+          "price": 6.00,
+          "description": "Crisp romaine, house Caesar dressing, parmesan, croutons",
+          "category": "sides",
+          "allergens": ["Dairy", "Eggs", "Gluten", "Fish"],
+          "tags": [],
+          "pairings": ["wagyu-smash-burger", "truffle-mushroom-burger"],
+          "calories": 220,
+          "popular": false,
+          "image": "🥬"
         },
         {
           "id": "onion-rings",
-          "name": "Onion Rings",
-          "price": 7.0,
-          "description": "Beer-battered, smoky ranch dip",
-          "dietary": [
-            "vegetarian",
-            "gluten"
-          ],
-          "pairings": [],
-          "image": "\ud83e\uddc5"
+          "name": "Crispy Onion Rings",
+          "price": 6.50,
+          "description": "Beer-battered onion rings, smoky ranch dip",
+          "category": "sides",
+          "allergens": ["Gluten", "Dairy"],
+          "tags": ["vegetarian"],
+          "pairings": ["classic-bistro-burger", "wagyu-smash-burger"],
+          "calories": 350,
+          "popular": false,
+          "image": "🧅"
+        },
+        {
+          "id": "mac-cheese",
+          "name": "Mac & Cheese",
+          "price": 7.50,
+          "description": "Cavatappi pasta, 3-cheese sauce, crispy breadcrumb top",
+          "category": "sides",
+          "allergens": ["Gluten", "Dairy", "Eggs"],
+          "tags": ["vegetarian"],
+          "pairings": ["classic-bistro-burger", "chicken-wings"],
+          "calories": 440,
+          "popular": false,
+          "image": "🧀"
+        },
+        {
+          "id": "coleslaw",
+          "name": "House Coleslaw",
+          "price": 4.50,
+          "description": "Cabbage slaw, apple cider vinaigrette, caraway seeds",
+          "category": "sides",
+          "allergens": ["Eggs"],
+          "tags": ["vegetarian", "gluten-free"],
+          "pairings": ["bbq-pulled-pork", "spicy-chicken-sandwich"],
+          "calories": 140,
+          "popular": false,
+          "image": "🥗"
         }
       ]
     },
@@ -138,64 +205,127 @@
       "name": "Drinks",
       "items": [
         {
-          "id": "classic-soda",
-          "name": "Classic Soda",
-          "price": 3.5,
-          "description": "Coke, Diet Coke, Sprite \u2014 your choice",
-          "dietary": [
-            "vegan",
-            "gluten-free"
-          ],
-          "pairings": [],
-          "image": "\ud83e\udd64"
-        },
-        {
-          "id": "lemonade",
-          "name": "Fresh Lemonade",
-          "price": 4.5,
-          "description": "House-squeezed, mint, light ice",
-          "dietary": [
-            "vegan",
-            "gluten-free"
-          ],
-          "pairings": [],
-          "image": "\ud83c\udf4b"
-        },
-        {
-          "id": "iced-tea",
-          "name": "Iced Tea",
-          "price": 3.5,
-          "description": "Brewed black tea, sweetened or unsweetened",
-          "dietary": [
-            "vegan",
-            "gluten-free"
-          ],
-          "pairings": [],
-          "image": "\ud83c\udf75"
+          "id": "still-water",
+          "name": "Still Water",
+          "price": 2.00,
+          "description": "Chilled still mineral water",
+          "category": "drinks",
+          "allergens": [],
+          "tags": ["vegan", "gluten-free"],
+          "pairings": ["veggie-grain-bowl"],
+          "calories": 0,
+          "popular": false,
+          "image": "🫗"
         },
         {
           "id": "sparkling-water",
           "name": "Sparkling Water",
-          "price": 2.5,
-          "description": "San Pellegrino",
-          "dietary": [
-            "vegan",
-            "gluten-free"
-          ],
-          "pairings": [],
-          "image": "\ud83d\udca7"
+          "price": 2.50,
+          "description": "San Pellegrino sparkling mineral water",
+          "category": "drinks",
+          "allergens": [],
+          "tags": ["vegan", "gluten-free"],
+          "pairings": ["tuna-tartare"],
+          "calories": 0,
+          "popular": false,
+          "image": "💧"
         },
         {
-          "id": "large-water",
-          "name": "Still Water (Large)",
-          "price": 2.0,
-          "description": "Large still water",
-          "dietary": [
-            "vegan",
-            "gluten-free"
-          ],
-          "pairings": [],
-          "image": "\ud83e\uded7"
+          "id": "fresh-lemonade",
+          "name": "Fresh Lemonade",
+          "price": 4.50,
+          "description": "House-squeezed lemon, mint, light ice",
+          "category": "drinks",
+          "allergens": [],
+          "tags": ["vegan"],
+          "pairings": ["spicy-chicken-sandwich", "veggie-grain-bowl"],
+          "calories": 120,
+          "popular": false,
+          "image": "🍋"
+        },
+        {
+          "id": "iced-tea",
+          "name": "Iced Tea",
+          "price": 3.50,
+          "description": "Brewed black tea, sweetened or unsweetened",
+          "category": "drinks",
+          "allergens": [],
+          "tags": ["vegan"],
+          "pairings": ["truffle-mushroom-burger", "veggie-grain-bowl"],
+          "calories": 80,
+          "popular": false,
+          "image": "🍵"
+        },
+        {
+          "id": "craft-cola",
+          "name": "Craft Cola",
+          "price": 3.00,
+          "description": "House-made cola with natural spices, chilled",
+          "category": "drinks",
+          "allergens": [],
+          "tags": ["vegan"],
+          "pairings": ["classic-bistro-burger", "chicken-wings"],
+          "calories": 140,
+          "popular": false,
+          "image": "🥤"
+        },
+        {
+          "id": "root-beer-float",
+          "name": "Root Beer Float",
+          "price": 6.00,
+          "description": "House root beer, two scoops vanilla bean ice cream",
+          "category": "drinks",
+          "allergens": ["Dairy"],
+          "tags": ["vegetarian"],
+          "pairings": ["wagyu-smash-burger", "classic-bistro-burger"],
+          "calories": 340,
+          "popular": false,
+          "image": "🍺"
+        }
+      ]
+    },
+    {
+      "id": "desserts",
+      "name": "Desserts",
+      "items": [
+        {
+          "id": "warm-brownie",
+          "name": "Warm Chocolate Brownie",
+          "price": 7.50,
+          "description": "Valrhona chocolate brownie, warm, served with vanilla ice cream",
+          "category": "desserts",
+          "allergens": ["Dairy", "Eggs", "Gluten", "Nuts"],
+          "tags": ["vegetarian"],
+          "pairings": ["still-water", "iced-tea"],
+          "calories": 480,
+          "popular": false,
+          "image": "🍫"
+        },
+        {
+          "id": "vanilla-cheesecake",
+          "name": "New York Cheesecake",
+          "price": 8.00,
+          "description": "Classic New York style, graham cracker crust, berry coulis",
+          "category": "desserts",
+          "allergens": ["Dairy", "Eggs", "Gluten"],
+          "tags": ["vegetarian"],
+          "pairings": ["still-water", "iced-tea"],
+          "calories": 420,
+          "popular": false,
+          "image": "🍰"
+        },
+        {
+          "id": "gelato-2-scoops",
+          "name": "Seasonal Gelato (2 scoops)",
+          "price": 6.50,
+          "description": "Ask your server for today's flavours — always made in-house",
+          "category": "desserts",
+          "allergens": ["Dairy"],
+          "tags": ["vegetarian", "gluten-free"],
+          "pairings": ["still-water", "fresh-lemonade"],
+          "calories": 280,
+          "popular": false,
+          "image": "🍨"
         }
       ]
     }
