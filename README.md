@@ -19,26 +19,21 @@ It is a production-grade monorepo with a React Native mobile app, a Node.js stre
 
 ## See It In Action
 
-### Ask Anything — The AI Knows Everything
+### The AI Conversation — Web
 
 <div align="center">
-  <img src="assets/Mobile_screenshot_Additional_1.jpg" width="32%" alt="AI displaying full menu with prices and calories in chat"/>
-  &nbsp;&nbsp;&nbsp;
-  <img src="assets/Desktop-Screenshot_1.png" width="60%" alt="AI answering price and discount queries on web"/>
-</div>
-
-<div align="center">
-<br/>
-
-| Mobile — Full Menu on Demand | Web — Natural Conversation |
-|:---:|:---:|
-| Ask "show me everything on the menu" — the AI responds with categorised tables including prices and calories | Price queries, cheapest items, edge cases — handled gracefully in plain English |
-
+  <img src="assets/Desktop-Screenshot_1.png" width="49%" alt="AI answering price queries and building the cart"/>
+  <img src="assets/Desktop-screenshot_2.png" width="49%" alt="AI handling edge cases and modifying the order"/>
+  <br/><br/>
+  <em>
+    Left — the AI answers price queries, explains the menu, and builds the cart in plain English.<br/>
+    Right — it gracefully deflects off-topic questions, doubles a line item on request, and tracks the running total.
+  </em>
 </div>
 
 <br/>
 
-### The Full Mobile Experience
+### The Full Mobile Experience — Android
 
 <div align="center">
   <img src="assets/mobile_screenshot_1.jpg" width="16%" alt="Home — AI recommendations + menu grid"/>

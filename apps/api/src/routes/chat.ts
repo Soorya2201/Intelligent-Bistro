@@ -187,7 +187,24 @@ router.post('/', async (req, res) => {
 
     // ─── POST: Proactive recommendations ──────────────────────────────────
     if (cartMutated && sessionId) {
-      const cartItemIds = cart.map((c: any) => c.item_id || c.id || c.menuItem?.id).filter(Boolean);
+      // Build post-mutation cart: start from incoming cart, apply tool results
+      const originalIds = new Set<string>(
+        cart.map((c: any) => c.item_id || c.id || c.menuItem?.id).filter(Boolean)
+      );
+      const addedIds = new Set<string>();
+      const removedIds = new Set<string>();
+      for (const tc of toolCalls) {
+        if (tc.status !== 'applied') continue;
+        if (tc.name === 'add_item') addedIds.add((tc.input as any).item_id);
+        else if (tc.name === 'remove_item') removedIds.add((tc.input as any).item_id);
+        else if (tc.name === 'update_quantity') addedIds.add((tc.input as any).item_id);
+        else if (tc.name === 'clear_cart') { originalIds.clear(); addedIds.clear(); }
+      }
+      const cartItemIds = [
+        ...[...originalIds].filter(id => !removedIds.has(id)),
+        ...addedIds,
+      ];
+
       const skip = shouldSkipRecommendations(sessionId, cartItemIds);
 
       if (!skip) {
