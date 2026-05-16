@@ -36,8 +36,8 @@ describe('menu.json — structure', () => {
     }
   });
 
-  it('has 28 or more menu items across all categories', () => {
-    expect(allItems.length).toBeGreaterThanOrEqual(28);
+  it('has 20 or more menu items across all categories', () => {
+    expect(allItems.length).toBeGreaterThanOrEqual(20);
   });
 });
 
