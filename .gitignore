@@ -18,3 +18,8 @@ Thumbs.db
 apps/api/data/*.db
 apps/api/data/*.db-shm
 apps/api/data/*.db-wal
+
+# Local spec/instruction files — keep off GitHub
+RECOMMENDATION_SYSTEM_FOR_CLAUDE_CODE.txt
+INTELLIGENT_BISTRO_AGENT_INSTRUCTIONS.txt
+INTELLIGENT_BISTRO_V2_CLAUDE_CODE_SPEC.txt
