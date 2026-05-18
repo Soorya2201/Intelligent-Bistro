@@ -59,6 +59,11 @@ export default function CheckoutScreen() {
   const [orderStage, setOrderStage]   = useState(0);
   const [orderId, setOrderId]         = useState<string | null>(null);
 
+  // ETA countdown state
+  const [etaMinutes, setEtaMinutes] = useState(() => Math.floor(Math.random() * 8) + 15);
+  const [etaSeconds, setEtaSeconds] = useState(0);
+  const [etaStage, setEtaStage] = useState<'preparing' | 'almost' | 'ready'>('preparing');
+
   // Receipt email opt-in state
   const [wantsReceipt, setWantsReceipt] = useState(!!profileEmail);
   const [emailInput, setEmailInput]     = useState(profileEmail);
@@ -97,6 +102,27 @@ export default function CheckoutScreen() {
     );
 
   }, []);
+
+  // ETA countdown — only runs after order is confirmed
+  // TODO: Replace with WebSocket subscription in production
+  useEffect(() => {
+    if (!isConfirmed) return;
+    const interval = setInterval(() => {
+      setEtaSeconds(s => {
+        if (s === 0) {
+          setEtaMinutes(m => {
+            const next = m - 1;
+            if (next <= 5) setEtaStage('almost');
+            if (next <= 0) { setEtaStage('ready'); clearInterval(interval); }
+            return Math.max(0, next);
+          });
+          return 59;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isConfirmed]);
 
   const handleConfirm = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -184,6 +210,25 @@ export default function CheckoutScreen() {
 
             {/* Stage display */}
             <OrderStatusBar stage={orderStage} />
+
+            {/* ETA countdown */}
+            {(() => {
+              const etaEmoji = etaStage === 'preparing' ? '🍳' : etaStage === 'almost' ? '🔥' : '✅';
+              const etaLabel = etaStage === 'preparing' ? 'Preparing your order'
+                             : etaStage === 'almost' ? 'Almost ready!'
+                             : 'Your order is ready!';
+              const etaTime = etaStage === 'ready' ? 'Enjoy your meal!'
+                            : `${String(etaMinutes).padStart(2, '0')}:${String(etaSeconds).padStart(2, '0')} ${etaStage === 'preparing' ? 'estimated' : 'remaining'}`;
+              return (
+                <View style={styles.etaCard}>
+                  <Text style={styles.etaEmoji}>{etaEmoji}</Text>
+                  <View>
+                    <Text style={styles.etaLabel}>{etaLabel}</Text>
+                    <Text style={styles.etaTime}>{etaTime}</Text>
+                  </View>
+                </View>
+              );
+            })()}
 
             {orderStage === ORDER_STAGES.length - 1 && (
               <Animated.View style={[styles.confettiContainer, { opacity: confettiAnim }]}>
@@ -422,4 +467,9 @@ const styles = StyleSheet.create({
     color: COLORS.bistroBrown,
     paddingVertical: 4,
   },
+
+  etaCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: COLORS.card, borderRadius: 14, padding: 16, marginHorizontal: 20, marginTop: 16, borderWidth: 0.5, borderColor: COLORS.border },
+  etaEmoji: { fontSize: 28 },
+  etaLabel: { fontSize: 14, fontWeight: '600', color: COLORS.bistroBrown },
+  etaTime: { fontSize: 12, color: COLORS.medGray, marginTop: 2 },
 });
