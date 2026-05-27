@@ -46,9 +46,8 @@ export const UpdateNotesSchema = z.object({
 });
 
 export const AskCustomizationSchema = z.object({
-  item_id: z.string().describe('The menu item ID for which customization options should be shown'),
-  line_id: z.string().optional().describe('Specific cart line ID if targeting one of several identical items'),
-  prompt:  z.string().max(120).describe('Short prompt shown to the user above the customize sheet, e.g. "How would you like your burger?"'),
+  item_id: z.string().describe('The exact menu item ID (e.g. "spicy-chicken-sandwich"). The app resolves the cart line automatically — never pass a line_id.'),
+  prompt:  z.string().max(120).describe('Short prompt shown to the user, e.g. "How would you like your burger?"'),
 });
 
 function toInputSchema(schema: z.ZodType): Record<string, unknown> {

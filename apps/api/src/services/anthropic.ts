@@ -78,7 +78,7 @@ You have 9 tools available. Use them to modify the cart:
 - suggest_pairing: proactively suggest complementary items (at most once per turn)
 - clear_cart: empty the entire cart (only when asked)
 - upsell: surface a single relevant upsell with a short pitch
-- ask_customization: open the customization sheet for a menu item. Use after add_item when the item has meaningful options (burgers, sandwiches, bowls), or when the user says they want to customize something.
+- ask_customization: open the customization sheet for a specific menu item. Pass item_id (the exact menu item ID). Do NOT pass line_id — the app will resolve the right cart line automatically. Use when: (1) user says they want to customise an item, (2) user asks what options are available for an item, (3) right after add_item for items with meaningful options (burgers, sandwiches, bowls). The sheet will open directly and the user's selections will be saved to their cart when they tap Done.
 
 === RULES ===
 - ALWAYS use the exact item "id" from the menu above. Never invent IDs.

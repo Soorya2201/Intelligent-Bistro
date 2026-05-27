@@ -80,10 +80,44 @@ export function useStreamParser() {
         break;
       }
       case 'ask_customization': {
-        const itemId = input.item_id as string;
-        const lineId = input.line_id as string | undefined;
-        // Find the most recently added line for this item, or use the provided lineId
-        openCustomize(lineId ?? itemId);
+        const menuItemId   = input.item_id as string;
+        const lineIdFromAI = input.line_id as string | undefined;
+
+        // Read current cart state imperatively (hooks can't be called in event handlers)
+        let state = useStore.getState();
+        let linesForItem = state.items.filter(i => i.menuItem.id === menuItemId);
+
+        // If item isn't in cart yet, add it so the sheet has something to show
+        if (linesForItem.length === 0) {
+          const menuItem = MENU_LOOKUP[menuItemId] ?? {
+            id: menuItemId,
+            name: menuItemId.replace(/-/g, ' '),
+            price: 0, description: '', pairings: [],
+            image: ITEM_IMAGES[menuItemId] ?? '🍽️',
+          };
+          state.addLine(menuItem);
+          // Re-read after mutation (Zustand set() is synchronous)
+          state = useStore.getState();
+          linesForItem = state.items.filter(i => i.menuItem.id === menuItemId);
+        }
+
+        if (linesForItem.length === 0) break;
+
+        // Prefer the AI-provided lineId if it's actually in the cart; otherwise use first match
+        const validLine = lineIdFromAI && linesForItem.find(l => l.lineId === lineIdFromAI);
+        let firstLineId = validLine ? lineIdFromAI! : linesForItem[0].lineId;
+
+        // Split any qty>1 lines so CustomizeSheet shows one tab per unit
+        for (const line of linesForItem) {
+          const current = useStore.getState().items.find(i => i.lineId === line.lineId);
+          if (current && current.quantity > 1) {
+            const ids = useStore.getState().splitLine(line.lineId);
+            if (line.lineId === linesForItem[0].lineId) firstLineId = ids[0];
+          }
+        }
+
+        openCustomize(firstLineId);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         break;
       }
     }
