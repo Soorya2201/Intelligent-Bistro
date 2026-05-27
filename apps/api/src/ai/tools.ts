@@ -40,6 +40,11 @@ export const UpsellSchema = z.object({
   pitch:   z.string().max(80),
 });
 
+export const UpdateNotesSchema = z.object({
+  item_id: z.string().describe('Exact menu item ID already in the cart'),
+  notes:   z.string().describe('Special preparation instructions for this item. Empty string clears existing notes.'),
+});
+
 function toInputSchema(schema: z.ZodType): Record<string, unknown> {
   // Zod v4 built-in JSON schema conversion
   const full = z.toJSONSchema(schema) as Record<string, unknown>;
@@ -83,9 +88,14 @@ export const BISTRO_TOOLS = [
     description: 'Surface a single upsell item with a short pitch.',
     input_schema: toInputSchema(UpsellSchema),
   },
+  {
+    name: 'update_notes',
+    description: 'Set or update special preparation instructions on a cart item already in the cart (e.g. "extra spicy", "no onions", "light dressing"). Use when the user specifies how they want an item prepared.',
+    input_schema: toInputSchema(UpdateNotesSchema),
+  },
 ];
 
-export type ToolName = 'add_item' | 'remove_item' | 'update_quantity' | 'clarify' | 'suggest_pairing' | 'clear_cart' | 'upsell';
+export type ToolName = 'add_item' | 'remove_item' | 'update_quantity' | 'clarify' | 'suggest_pairing' | 'clear_cart' | 'upsell' | 'update_notes';
 
 export interface ValidatedToolCall {
   name: ToolName;
@@ -99,13 +109,14 @@ export function validateToolInput(
   input: unknown,
 ): { success: true; data: unknown } | { success: false; error: string } {
   const schemaMap: Record<string, z.ZodType> = {
-    add_item:       AddItemSchema,
-    remove_item:    RemoveItemSchema,
+    add_item:        AddItemSchema,
+    remove_item:     RemoveItemSchema,
     update_quantity: UpdateQuantitySchema,
-    clarify:        ClarifySchema,
+    clarify:         ClarifySchema,
     suggest_pairing: SuggestPairingSchema,
-    clear_cart:     ClearCartSchema,
-    upsell:         UpsellSchema,
+    clear_cart:      ClearCartSchema,
+    upsell:          UpsellSchema,
+    update_notes:    UpdateNotesSchema,
   };
 
   const schema = schemaMap[name];

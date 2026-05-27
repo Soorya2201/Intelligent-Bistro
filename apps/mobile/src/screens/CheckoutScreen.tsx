@@ -150,6 +150,7 @@ export default function CheckoutScreen() {
           name:     c.menuItem.name,
           quantity: c.quantity,
           price:    c.menuItem.price,
+          notes:    c.specialInstructions,
         })),
         subtotal,
         tax,

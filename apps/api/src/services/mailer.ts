@@ -4,6 +4,7 @@ interface OrderItem {
   name: string;
   quantity: number;
   price: number;
+  notes?: string;
 }
 
 interface OrderData {
@@ -19,7 +20,10 @@ function buildOrderReceiptHtml(order: OrderData): string {
     .map(
       item => `
       <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #f0ebe3;color:#3d2b1f;font-size:14px;">${item.name}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #f0ebe3;color:#3d2b1f;font-size:14px;">
+          ${item.name}
+          ${item.notes ? `<br/><span style="font-size:11px;color:#9e9089;font-style:italic;">${item.notes}</span>` : ''}
+        </td>
         <td style="padding:10px 0;border-bottom:1px solid #f0ebe3;color:#8c7b6b;font-size:14px;text-align:center;">×${item.quantity}</td>
         <td style="padding:10px 0;border-bottom:1px solid #f0ebe3;color:#3d2b1f;font-size:14px;text-align:right;font-weight:600;">$${(item.price * item.quantity).toFixed(2)}</td>
       </tr>`,

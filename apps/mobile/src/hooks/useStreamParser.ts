@@ -8,6 +8,7 @@ export function useStreamParser() {
   const addItem                        = useStore(s => s.addItem);
   const removeItem                     = useStore(s => s.removeItem);
   const updateQuantity                 = useStore(s => s.updateQuantity);
+  const updateInstructions             = useStore(s => s.updateInstructions);
   const clearCart                      = useStore(s => s.clearCart);
   const setQuickReplies                = useStore(s => s.setQuickReplies);
   const setToolCallsOnLastMessage      = useStore(s => s.setToolCallsOnLastMessage);
@@ -24,6 +25,7 @@ export function useStreamParser() {
       case 'add_item': {
         const itemId   = input.item_id as string;
         const quantity = input.quantity as number;
+        const notes    = input.notes as string | undefined;
         if (itemId === 'combo-discount') {
           addItem({ id: 'combo-discount', name: 'Combo Discount', price: -2.00, description: 'Combo saving', pairings: [], image: '🎉' }, quantity);
           break;
@@ -33,7 +35,11 @@ export function useStreamParser() {
           id: itemId, name: itemId.replace(/-/g, ' '),
           price: 0, description: '', pairings: [],
           image: ITEM_IMAGES[itemId] ?? '🍽️',
-        }, quantity);
+        }, quantity, notes);
+        break;
+      }
+      case 'update_notes': {
+        updateInstructions(input.item_id as string, input.notes as string);
         break;
       }
       case 'remove_item': {
