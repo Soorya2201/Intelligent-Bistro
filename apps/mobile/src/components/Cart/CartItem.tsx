@@ -106,12 +106,23 @@ export default function CartItem({
             <Text style={styles.customiseBtnText}>✦ Customise</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity onPress={toggleNote} style={styles.noteTrigger}>
-          <Text style={styles.noteTriggerText}>
-            {noteOpen ? '↑ Done' : hasNote ? `✎ ${item.specialInstructions}` : '✎ Note'}
+        <TouchableOpacity
+          onPress={toggleNote}
+          style={[styles.noteBtn, noteOpen && styles.noteBtnActive]}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.noteBtnText, noteOpen && styles.noteBtnTextActive]}>
+            {noteOpen ? '✓ Done' : '✎ Note'}
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Inline note preview when collapsed and has note */}
+      {!noteOpen && hasNote && (
+        <Text style={styles.notePreview} numberOfLines={1}>
+          "{item.specialInstructions}"
+        </Text>
+      )}
 
       {noteOpen && (
         <TextInput
@@ -192,16 +203,18 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginTop: 6,
+    gap: 8,
+    marginTop: 8,
     marginLeft: 4,
   },
+  // Solid gold pill — Customise
   customiseBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.bistroGold,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 20,
+    backgroundColor: COLORS.bistroGold,
+    borderWidth: 1,
+    borderColor: COLORS.bistroGold,
   },
   customiseBtnText: {
     fontSize: 11,
@@ -209,12 +222,34 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.2,
   },
-  noteTrigger: { alignSelf: 'flex-start' },
-  noteTriggerText: {
+  // Outline pill — Note (transparent + brown border)
+  noteBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.bistroBrown,
+  },
+  noteBtnActive: {
+    backgroundColor: COLORS.bistroBrown,
+  },
+  noteBtnText: {
     fontSize: 11,
+    color: COLORS.bistroBrown,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  noteBtnTextActive: {
+    color: COLORS.white,
+  },
+  notePreview: {
+    fontSize: 10,
     color: COLORS.medGray,
     fontStyle: 'italic',
-    maxWidth: 200,
+    marginTop: 4,
+    marginLeft: 4,
+    lineHeight: 14,
   },
   noteInput: {
     marginTop: 6,
