@@ -70,7 +70,25 @@ export default function CartSheet({ onClose }: { onClose: () => void }) {
               <Text style={styles.emptyText}>Your cart is empty.{'\n'}Chat or tap a suggestion above.</Text>
             </View>
           ) : (
-            items.map(item => <CartItem key={item.menuItem.id} item={item} />)
+            (() => {
+              // Count how many lines exist per menuItem so we can label duplicates
+              const counts: Record<string, number> = {};
+              for (const it of items) counts[it.menuItem.id] = (counts[it.menuItem.id] ?? 0) + 1;
+              const seen: Record<string, number> = {};
+              return items.map(item => {
+                seen[item.menuItem.id] = (seen[item.menuItem.id] ?? 0) + 1;
+                const itemNumber = counts[item.menuItem.id] > 1 ? seen[item.menuItem.id] : undefined;
+                const totalCount = counts[item.menuItem.id] > 1 ? counts[item.menuItem.id] : undefined;
+                return (
+                  <CartItem
+                    key={item.lineId}
+                    item={item}
+                    itemNumber={itemNumber}
+                    totalCount={totalCount}
+                  />
+                );
+              });
+            })()
           )}
         </ScrollView>
 

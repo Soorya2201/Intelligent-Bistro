@@ -10,7 +10,15 @@ if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
 }
 
-export default function CartItem({ item }: { item: CartItemType }) {
+export default function CartItem({
+  item,
+  itemNumber,
+  totalCount,
+}: {
+  item: CartItemType;
+  itemNumber?: number;
+  totalCount?: number;
+}) {
   const updateQuantity     = useStore(s => s.updateQuantity);
   const updateInstructions = useStore(s => s.updateInstructions);
   const openCustomize      = useStore(s => s.openCustomize);
@@ -51,10 +59,17 @@ export default function CartItem({ item }: { item: CartItemType }) {
         <Text style={styles.emoji}>{item.menuItem.image}</Text>
 
         <View style={styles.info}>
-          <Text style={styles.name} numberOfLines={1}>{item.menuItem.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>{item.menuItem.name}</Text>
+            {itemNumber != null && (
+              <View style={styles.itemBadge}>
+                <Text style={styles.itemBadgeText}>{itemNumber}/{totalCount}</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.price}>${displayPrice.toFixed(2)}</Text>
           {customSummary ? (
-            <Text style={styles.customSummary} numberOfLines={1}>{customSummary}</Text>
+            <Text style={styles.customSummary} numberOfLines={2}>{customSummary}</Text>
           ) : null}
         </View>
 
@@ -139,15 +154,24 @@ const styles = StyleSheet.create({
     gap: 12,
     marginLeft: 4,
   },
-  emoji:  { fontSize: 24, flexShrink: 0 },
-  info:   { flex: 1, minWidth: 0 },
-  name:   { fontSize: 13, fontWeight: '500', color: COLORS.bistroBrown },
+  emoji:   { fontSize: 24, flexShrink: 0 },
+  info:    { flex: 1, minWidth: 0 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  name:    { fontSize: 13, fontWeight: '500', color: COLORS.bistroBrown, flexShrink: 1 },
+  itemBadge: {
+    backgroundColor: COLORS.bistroGold,
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  itemBadgeText: { fontSize: 9, color: COLORS.white, fontWeight: '700' },
   price:  { fontSize: 12, color: COLORS.bistroGold, fontWeight: '500', marginTop: 1 },
   customSummary: {
     fontSize: 10,
     color: COLORS.medGray,
     marginTop: 2,
     fontStyle: 'italic',
+    lineHeight: 14,
   },
 
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
