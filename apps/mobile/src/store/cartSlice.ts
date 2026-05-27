@@ -17,6 +17,7 @@ export interface CartSlice {
   updateLineCustomizations: (lineId: string, customizations: CartLineCustomization[]) => void;
   updateLineQuantity: (lineId: string, qty: number) => void;
   updateLineInstructions: (lineId: string, instructions: string) => void;
+  splitLine: (lineId: string) => string[];   // explode qty>1 into N qty=1 lines; returns all lineIds
   getLinesByMenuItem: (menuItemId: string) => CartLine[];
 
   // ── Legacy adapters (backward-compatible) ─────────────────────────────────
@@ -102,6 +103,32 @@ export const createCartSlice: StateCreator<CartSlice, [], [], CartSlice> = (set,
     set(state => ({
       items: state.items.map(i => i.lineId === lineId ? { ...i, specialInstructions: instructions } : i),
     }));
+  },
+
+  splitLine: (lineId) => {
+    const line = get().items.find(i => i.lineId === lineId);
+    if (!line || line.quantity <= 1) return [lineId];
+
+    // Pre-generate IDs so we can return them synchronously
+    const extraIds = Array.from({ length: line.quantity - 1 }, () => newLineId());
+
+    set(state => {
+      const extraLines = extraIds.map(id => ({
+        ...line,
+        lineId: id,
+        quantity: 1,
+        // Each extra line starts with same customizations as the original
+      }));
+      return {
+        items: state.items.flatMap(i =>
+          i.lineId === lineId
+            ? [{ ...i, quantity: 1 }, ...extraLines]
+            : [i]
+        ),
+      };
+    });
+
+    return [lineId, ...extraIds];
   },
 
   // ── Legacy: merge by menuItemId + same customizations ────────────────────
