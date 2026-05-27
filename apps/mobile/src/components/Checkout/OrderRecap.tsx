@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useStore } from '../../store';
 import { COLORS, SPACING, RADIUS } from '../../constants/theme';
+import { summariseCustomizations } from '../../utils/customizations';
 
 interface OrderRecapProps {
   narrationText: string;
@@ -38,13 +39,69 @@ export default function OrderRecap({ narrationText }: OrderRecapProps) {
         </View>
 
         <View style={styles.cardBody}>
-          {items.map(item => (
-            <View key={item.menuItem.id} style={styles.lineItem}>
-              <Text style={styles.lineQty}>{item.quantity}×</Text>
-              <Text style={styles.lineName} numberOfLines={1}>{item.menuItem.name}</Text>
-              <Text style={styles.linePrice}>${(item.menuItem.price * item.quantity).toFixed(2)}</Text>
-            </View>
-          ))}
+          {(() => {
+            // Group lines by menuItem, preserving order
+            const orderMap: Record<string, number> = {};
+            const groups: Record<string, typeof items> = {};
+            for (const it of items) {
+              if (!groups[it.menuItem.id]) {
+                orderMap[it.menuItem.id] = Object.keys(groups).length;
+                groups[it.menuItem.id] = [];
+              }
+              groups[it.menuItem.id].push(it);
+            }
+            return Object.entries(groups)
+              .sort(([a], [b]) => orderMap[a] - orderMap[b])
+              .map(([menuItemId, lines]) => {
+                const isMulti = lines.length > 1;
+                return (
+                  <View key={menuItemId} style={styles.groupBlock}>
+                    {isMulti ? (
+                      <>
+                        {/* Group header */}
+                        <View style={styles.lineItem}>
+                          <Text style={styles.lineQty}>{lines.reduce((s, l) => s + l.quantity, 0)}×</Text>
+                          <Text style={styles.lineName} numberOfLines={1}>{lines[0].menuItem.name}</Text>
+                          <Text style={styles.linePrice}>
+                            ${lines.reduce((s, l) => s + (l.menuItem.price + (l.customizationPriceDelta ?? 0)) * l.quantity, 0).toFixed(2)}
+                          </Text>
+                        </View>
+                        {/* Per-line customization detail */}
+                        {lines.map((line, i) => {
+                          const custom = summariseCustomizations(line.menuItem.id, line.customizations ?? []);
+                          const linePrice = (line.menuItem.price + (line.customizationPriceDelta ?? 0)) * line.quantity;
+                          return (
+                            <View key={line.lineId} style={styles.subLineItem}>
+                              <Text style={styles.subLineIndex}>  Item {i + 1}</Text>
+                              <Text style={styles.subLineCustom} numberOfLines={1}>
+                                {custom || 'Default'}
+                              </Text>
+                              <Text style={styles.subLinePrice}>${linePrice.toFixed(2)}</Text>
+                            </View>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.lineItem}>
+                          <Text style={styles.lineQty}>{lines[0].quantity}×</Text>
+                          <Text style={styles.lineName} numberOfLines={1}>{lines[0].menuItem.name}</Text>
+                          <Text style={styles.linePrice}>
+                            ${((lines[0].menuItem.price + (lines[0].customizationPriceDelta ?? 0)) * lines[0].quantity).toFixed(2)}
+                          </Text>
+                        </View>
+                        {(() => {
+                          const custom = summariseCustomizations(lines[0].menuItem.id, lines[0].customizations ?? []);
+                          return custom ? (
+                            <Text style={styles.singleCustom} numberOfLines={2}>{custom}</Text>
+                          ) : null;
+                        })()}
+                      </>
+                    )}
+                  </View>
+                );
+              });
+          })()}
 
           <View style={styles.divider} />
 
@@ -144,6 +201,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.md,
   },
+  groupBlock: {
+    marginBottom: 4,
+  },
   lineItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -164,6 +224,37 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.bistroBrown,
+  },
+  subLineItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    paddingLeft: 24,
+  },
+  subLineIndex: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.medGray,
+    width: 44,
+  },
+  subLineCustom: {
+    flex: 1,
+    fontSize: 10,
+    color: COLORS.medGray,
+    fontStyle: 'italic',
+  },
+  subLinePrice: {
+    fontSize: 10,
+    color: COLORS.medGray,
+    fontWeight: '500',
+  },
+  singleCustom: {
+    fontSize: 10,
+    color: COLORS.medGray,
+    fontStyle: 'italic',
+    paddingLeft: 24,
+    paddingBottom: 3,
+    lineHeight: 14,
   },
 
   divider: {

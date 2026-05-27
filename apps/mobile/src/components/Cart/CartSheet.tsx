@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useStore } from '../../store';
-import CartItem from './CartItem';
+import GroupedCartItem from './GroupedCartItem';
 import { COLORS } from '../../constants/theme';
 import { getMenuItem } from '../../utils/menuLookup';
 
@@ -71,23 +71,21 @@ export default function CartSheet({ onClose }: { onClose: () => void }) {
             </View>
           ) : (
             (() => {
-              // Count how many lines exist per menuItem so we can label duplicates
-              const counts: Record<string, number> = {};
-              for (const it of items) counts[it.menuItem.id] = (counts[it.menuItem.id] ?? 0) + 1;
-              const seen: Record<string, number> = {};
-              return items.map(item => {
-                seen[item.menuItem.id] = (seen[item.menuItem.id] ?? 0) + 1;
-                const itemNumber = counts[item.menuItem.id] > 1 ? seen[item.menuItem.id] : undefined;
-                const totalCount = counts[item.menuItem.id] > 1 ? counts[item.menuItem.id] : undefined;
-                return (
-                  <CartItem
-                    key={item.lineId}
-                    item={item}
-                    itemNumber={itemNumber}
-                    totalCount={totalCount}
-                  />
-                );
-              });
+              // Group lines by menuItem.id, preserving first-appearance order
+              const orderMap: Record<string, number> = {};
+              const groups: Record<string, typeof items> = {};
+              for (const it of items) {
+                if (groups[it.menuItem.id] === undefined) {
+                  orderMap[it.menuItem.id] = Object.keys(groups).length;
+                  groups[it.menuItem.id] = [];
+                }
+                groups[it.menuItem.id].push(it);
+              }
+              return Object.entries(groups)
+                .sort(([a], [b]) => orderMap[a] - orderMap[b])
+                .map(([menuItemId, lines]) => (
+                  <GroupedCartItem key={menuItemId} lines={lines} />
+                ));
             })()
           )}
         </ScrollView>
