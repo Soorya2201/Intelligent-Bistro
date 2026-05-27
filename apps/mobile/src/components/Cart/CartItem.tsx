@@ -19,9 +19,10 @@ export default function CartItem({
   itemNumber?: number;
   totalCount?: number;
 }) {
-  const updateQuantity     = useStore(s => s.updateQuantity);
-  const updateInstructions = useStore(s => s.updateInstructions);
-  const openCustomize      = useStore(s => s.openCustomize);
+  const removeLine             = useStore(s => s.removeLine);
+  const updateLineQuantity     = useStore(s => s.updateLineQuantity);
+  const updateLineInstructions = useStore(s => s.updateLineInstructions);
+  const openCustomize          = useStore(s => s.openCustomize);
 
   const hasGroups   = getCustomizationGroups(item.menuItem.id).length > 0;
   const customSummary = summariseCustomizations(item.menuItem.id, item.customizations ?? []);
@@ -39,12 +40,12 @@ export default function CartItem({
       setTimeout(() => inputRef.current?.focus(), 80);
     } else {
       setNoteOpen(false);
-      updateInstructions(item.menuItem.id, draft.trim());
+      updateLineInstructions(item.lineId, draft.trim());
     }
   };
 
   const handleBlur = () => {
-    updateInstructions(item.menuItem.id, draft.trim());
+    updateLineInstructions(item.lineId, draft.trim());
   };
 
   return (
@@ -76,14 +77,17 @@ export default function CartItem({
         <View style={styles.qtyRow}>
           <TouchableOpacity
             style={styles.qtyBtn}
-            onPress={() => updateQuantity(item.menuItem.id, item.quantity - 1)}
+            onPress={() => {
+              if (item.quantity <= 1) removeLine(item.lineId);
+              else updateLineQuantity(item.lineId, item.quantity - 1);
+            }}
           >
             <Text style={styles.qtyBtnText}>−</Text>
           </TouchableOpacity>
           <Text style={styles.qtyNum}>{item.quantity}</Text>
           <TouchableOpacity
             style={[styles.qtyBtn, styles.qtyBtnPlus]}
-            onPress={() => updateQuantity(item.menuItem.id, item.quantity + 1)}
+            onPress={() => updateLineQuantity(item.lineId, item.quantity + 1)}
           >
             <Text style={[styles.qtyBtnText, { color: COLORS.bistroBrown }]}>+</Text>
           </TouchableOpacity>

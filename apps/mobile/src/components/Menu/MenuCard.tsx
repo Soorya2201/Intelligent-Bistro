@@ -24,38 +24,54 @@ const DIET_COLOR: Record<string, { bg: string; text: string }> = {
 };
 
 export default function MenuCard({ item, index = 0 }: MenuCardProps) {
-  const addItem           = useStore(s => s.addItem);
-  const addLine           = useStore(s => s.addLine);
-  const updateQuantity    = useStore(s => s.updateQuantity);
-  const cartItems         = useStore(s => s.items);
-  const toggleLike        = useStore(s => s.toggleLike);
-  const isLiked           = useStore(s => s.isLiked(item.id));
-  const openCustomize     = useStore(s => s.openCustomize);
+  const addItem            = useStore(s => s.addItem);
+  const addLine            = useStore(s => s.addLine);
+  const removeLine         = useStore(s => s.removeLine);
+  const cartItems          = useStore(s => s.items);
+  const toggleLike         = useStore(s => s.toggleLike);
+  const isLiked            = useStore(s => s.isLiked(item.id));
+  const openCustomize      = useStore(s => s.openCustomize);
   const getLinesByMenuItem = useStore(s => s.getLinesByMenuItem);
 
-  const qty         = cartItems.filter(i => i.menuItem.id === item.id).reduce((s, i) => s + i.quantity, 0);
+  const lines       = cartItems.filter(i => i.menuItem.id === item.id);
+  const qty         = lines.reduce((s, i) => s + i.quantity, 0);
   const hasGroups   = getCustomizationGroups(item.id).length > 0;
   const photo       = MENU_IMAGES[item.id];
   const dietaryTags = (item.tags ?? item.dietary ?? []).slice(0, 2);
 
+  // First tap: just add (no auto-open customize)
   const handleAdd = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (hasGroups) {
-      // Create line first then open customize sheet
-      const lineId = addLine(item);
-      openCustomize(lineId);
+    addItem(item, 1);
+  };
+
+  // Each subsequent + creates a new independent line (so tabs show per unit)
+  const handleIncrease = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    addLine(item);
+  };
+
+  // − removes the most-recently-added line
+  const handleDecrease = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const currentLines = getLinesByMenuItem(item.id);
+    if (currentLines.length === 0) return;
+    const last = currentLines[currentLines.length - 1];
+    if (last.quantity <= 1) {
+      removeLine(last.lineId);
     } else {
-      addItem(item, 1);
+      // AI-added line with qty > 1 — just decrement
+      removeLine(last.lineId);
     }
   };
-  const handleIncrease = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updateQuantity(item.id, qty + 1); };
-  const handleDecrease = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updateQuantity(item.id, qty - 1); };
-  const handleLike     = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleLike(item); };
 
+  const handleLike = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleLike(item); };
+
+  // Opens customize sheet showing all lines (tabs) for this item
   const handleCustomise = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const lines = getLinesByMenuItem(item.id);
-    if (lines.length > 0) openCustomize(lines[lines.length - 1].lineId);
+    const currentLines = getLinesByMenuItem(item.id);
+    if (currentLines.length > 0) openCustomize(currentLines[0].lineId);
   };
 
   return (

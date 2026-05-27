@@ -15,6 +15,8 @@ export interface CartSlice {
   addLine: (menuItem: MenuItem, customizations?: CartLineCustomization[], notes?: string) => string;
   removeLine: (lineId: string) => void;
   updateLineCustomizations: (lineId: string, customizations: CartLineCustomization[]) => void;
+  updateLineQuantity: (lineId: string, qty: number) => void;
+  updateLineInstructions: (lineId: string, instructions: string) => void;
   getLinesByMenuItem: (menuItemId: string) => CartLine[];
 
   // ── Legacy adapters (backward-compatible) ─────────────────────────────────
@@ -85,6 +87,22 @@ export const createCartSlice: StateCreator<CartSlice, [], [], CartSlice> = (set,
   },
 
   getLinesByMenuItem: (menuItemId) => get().items.filter(i => i.menuItem.id === menuItemId),
+
+  updateLineQuantity: (lineId, qty) => {
+    if (qty <= 0) {
+      get().removeLine(lineId);
+      return;
+    }
+    set(state => ({
+      items: state.items.map(i => i.lineId === lineId ? { ...i, quantity: qty } : i),
+    }));
+  },
+
+  updateLineInstructions: (lineId, instructions) => {
+    set(state => ({
+      items: state.items.map(i => i.lineId === lineId ? { ...i, specialInstructions: instructions } : i),
+    }));
+  },
 
   // ── Legacy: merge by menuItemId + same customizations ────────────────────
 
