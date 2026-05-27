@@ -20,6 +20,7 @@ export default function CartItem({
   totalCount?: number;
 }) {
   const removeLine             = useStore(s => s.removeLine);
+  const splitLine              = useStore(s => s.splitLine);
   const updateLineQuantity     = useStore(s => s.updateLineQuantity);
   const updateLineInstructions = useStore(s => s.updateLineInstructions);
   const openCustomize          = useStore(s => s.openCustomize);
@@ -98,7 +99,10 @@ export default function CartItem({
       <View style={styles.actionRow}>
         {hasGroups && (
           <TouchableOpacity
-            onPress={() => openCustomize(item.lineId)}
+            onPress={() => {
+              const lineIds = splitLine(item.lineId);
+              openCustomize(lineIds[0]);
+            }}
             style={styles.customiseBtn}
             accessibilityRole="button"
             accessibilityLabel={`Customise ${item.menuItem.name}`}

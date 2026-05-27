@@ -27,6 +27,7 @@ export default function MenuCard({ item, index = 0 }: MenuCardProps) {
   const addItem            = useStore(s => s.addItem);
   const addLine            = useStore(s => s.addLine);
   const removeLine         = useStore(s => s.removeLine);
+  const splitLine          = useStore(s => s.splitLine);
   const cartItems          = useStore(s => s.items);
   const toggleLike         = useStore(s => s.toggleLike);
   const isLiked            = useStore(s => s.isLiked(item.id));
@@ -71,7 +72,14 @@ export default function MenuCard({ item, index = 0 }: MenuCardProps) {
   const handleCustomise = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const currentLines = getLinesByMenuItem(item.id);
-    if (currentLines.length > 0) openCustomize(currentLines[0].lineId);
+    if (currentLines.length === 0) return;
+    // Split any line with qty > 1 (e.g. AI-added items) so each unit gets its own tab
+    let firstLineId = currentLines[0].lineId;
+    for (const line of currentLines) {
+      const ids = splitLine(line.lineId);
+      if (line.lineId === currentLines[0].lineId) firstLineId = ids[0];
+    }
+    openCustomize(firstLineId);
   };
 
   return (
