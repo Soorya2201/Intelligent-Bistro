@@ -4,6 +4,7 @@ import Animated, { FadeInRight, Layout } from 'react-native-reanimated';
 import { CartItem as CartItemType } from '../../types';
 import { useStore } from '../../store';
 import { COLORS } from '../../constants/theme';
+import { getCustomizationGroups, summariseCustomizations } from '../../utils/customizations';
 
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -11,13 +12,17 @@ if (Platform.OS === 'android') {
 
 export default function CartItem({ item }: { item: CartItemType }) {
   const updateQuantity     = useStore(s => s.updateQuantity);
-  const removeItem         = useStore(s => s.removeItem);
   const updateInstructions = useStore(s => s.updateInstructions);
+  const openCustomize      = useStore(s => s.openCustomize);
 
-  const hasNote = !!item.specialInstructions;
-  const [noteOpen, setNoteOpen]   = useState(hasNote);
-  const [draft, setDraft]         = useState(item.specialInstructions ?? '');
+  const hasGroups   = getCustomizationGroups(item.menuItem.id).length > 0;
+  const customSummary = summariseCustomizations(item.menuItem.id, item.customizations ?? []);
+  const hasNote     = !!item.specialInstructions;
+  const [noteOpen, setNoteOpen] = useState(hasNote);
+  const [draft, setDraft]       = useState(item.specialInstructions ?? '');
   const inputRef = useRef<TextInput>(null);
+
+  const displayPrice = item.menuItem.price + (item.customizationPriceDelta ?? 0);
 
   const toggleNote = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -40,7 +45,6 @@ export default function CartItem({ item }: { item: CartItemType }) {
       layout={Layout.springify()}
       style={styles.container}
     >
-      {/* gold left border accent */}
       <View style={styles.accent} />
 
       <View style={styles.mainRow}>
@@ -48,7 +52,10 @@ export default function CartItem({ item }: { item: CartItemType }) {
 
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>{item.menuItem.name}</Text>
-          <Text style={styles.price}>${item.menuItem.price.toFixed(2)}</Text>
+          <Text style={styles.price}>${displayPrice.toFixed(2)}</Text>
+          {customSummary ? (
+            <Text style={styles.customSummary} numberOfLines={1}>{customSummary}</Text>
+          ) : null}
         </View>
 
         <View style={styles.qtyRow}>
@@ -68,11 +75,21 @@ export default function CartItem({ item }: { item: CartItemType }) {
         </View>
       </View>
 
-      {/* Note row */}
-      <View style={styles.noteRow}>
+      {/* Action row — Customise + note */}
+      <View style={styles.actionRow}>
+        {hasGroups && (
+          <TouchableOpacity
+            onPress={() => openCustomize(item.lineId)}
+            style={styles.customiseBtn}
+            accessibilityRole="button"
+            accessibilityLabel={`Customise ${item.menuItem.name}`}
+          >
+            <Text style={styles.customiseBtnText}>⚙ Customise</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={toggleNote} style={styles.noteTrigger}>
           <Text style={styles.noteTriggerText}>
-            {noteOpen ? '↑ Done' : hasNote ? `✎ ${item.specialInstructions}` : '✎ Add note'}
+            {noteOpen ? '↑ Done' : hasNote ? `✎ ${item.specialInstructions}` : '✎ Note'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -126,6 +143,13 @@ const styles = StyleSheet.create({
   info:   { flex: 1, minWidth: 0 },
   name:   { fontSize: 13, fontWeight: '500', color: COLORS.bistroBrown },
   price:  { fontSize: 12, color: COLORS.bistroGold, fontWeight: '500', marginTop: 1 },
+  customSummary: {
+    fontSize: 10,
+    color: COLORS.medGray,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   qtyBtn: {
     width: 24, height: 24, borderRadius: 12,
@@ -137,16 +161,25 @@ const styles = StyleSheet.create({
   qtyBtnText: { fontSize: 14, color: COLORS.bistroBrown, lineHeight: 18 },
   qtyNum: { fontSize: 13, fontWeight: '500', minWidth: 16, textAlign: 'center', color: COLORS.bistroBrown },
 
-  noteRow: {
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     marginTop: 6,
     marginLeft: 4,
+  },
+  customiseBtn: { alignSelf: 'flex-start' },
+  customiseBtnText: {
+    fontSize: 11,
+    color: COLORS.bistroAccent,
+    fontWeight: '600',
   },
   noteTrigger: { alignSelf: 'flex-start' },
   noteTriggerText: {
     fontSize: 11,
     color: COLORS.medGray,
     fontStyle: 'italic',
-    maxWidth: 240,
+    maxWidth: 200,
   },
   noteInput: {
     marginTop: 6,

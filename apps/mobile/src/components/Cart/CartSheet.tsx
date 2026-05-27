@@ -29,7 +29,7 @@ export default function CartSheet({ onClose }: { onClose: () => void }) {
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Your Order</Text>
-            <Text style={styles.subtitle}>Tap an item to add a note</Text>
+            <Text style={styles.subtitle}>Tap an item to customise or add a note</Text>
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Text style={styles.closeText}>✕</Text>

@@ -14,6 +14,7 @@ export function useStreamParser() {
   const setToolCallsOnLastMessage      = useStore(s => s.setToolCallsOnLastMessage);
   const setRecommendationsOnLastMessage = useStore(s => s.setRecommendationsOnLastMessage);
   const setPendingActions              = useStore(s => s.setPendingActions);
+  const openCustomize                  = useStore(s => s.openCustomize);
 
   const dispatchToolCall = (toolCall: ToolCallRecord) => {
     if (toolCall.status !== 'applied') return;
@@ -76,6 +77,13 @@ export function useStreamParser() {
         const pitch = input.pitch as string;
         const label = pitch.length < 60 ? pitch : `Try ${(input.item_id as string).replace(/-/g, ' ')}`;
         setQuickReplies([label]);
+        break;
+      }
+      case 'ask_customization': {
+        const itemId = input.item_id as string;
+        const lineId = input.line_id as string | undefined;
+        // Find the most recently added line for this item, or use the provided lineId
+        openCustomize(lineId ?? itemId);
         break;
       }
     }

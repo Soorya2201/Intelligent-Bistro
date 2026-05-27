@@ -45,6 +45,12 @@ export const UpdateNotesSchema = z.object({
   notes:   z.string().describe('Special preparation instructions for this item. Empty string clears existing notes.'),
 });
 
+export const AskCustomizationSchema = z.object({
+  item_id: z.string().describe('The menu item ID for which customization options should be shown'),
+  line_id: z.string().optional().describe('Specific cart line ID if targeting one of several identical items'),
+  prompt:  z.string().max(120).describe('Short prompt shown to the user above the customize sheet, e.g. "How would you like your burger?"'),
+});
+
 function toInputSchema(schema: z.ZodType): Record<string, unknown> {
   // Zod v4 built-in JSON schema conversion
   const full = z.toJSONSchema(schema) as Record<string, unknown>;
@@ -93,9 +99,14 @@ export const BISTRO_TOOLS = [
     description: 'Set or update special preparation instructions on a cart item already in the cart (e.g. "extra spicy", "no onions", "light dressing"). Use when the user specifies how they want an item prepared.',
     input_schema: toInputSchema(UpdateNotesSchema),
   },
+  {
+    name: 'ask_customization',
+    description: 'Open the customization sheet for a specific menu item so the user can select preparation options (cook level, cheese, toppings, sauces, etc.). Use when the user adds an item and may want to customize it, or explicitly asks to customize.',
+    input_schema: toInputSchema(AskCustomizationSchema),
+  },
 ];
 
-export type ToolName = 'add_item' | 'remove_item' | 'update_quantity' | 'clarify' | 'suggest_pairing' | 'clear_cart' | 'upsell' | 'update_notes';
+export type ToolName = 'add_item' | 'remove_item' | 'update_quantity' | 'clarify' | 'suggest_pairing' | 'clear_cart' | 'upsell' | 'update_notes' | 'ask_customization';
 
 export interface ValidatedToolCall {
   name: ToolName;
@@ -116,7 +127,8 @@ export function validateToolInput(
     suggest_pairing: SuggestPairingSchema,
     clear_cart:      ClearCartSchema,
     upsell:          UpsellSchema,
-    update_notes:    UpdateNotesSchema,
+    update_notes:      UpdateNotesSchema,
+    ask_customization: AskCustomizationSchema,
   };
 
   const schema = schemaMap[name];

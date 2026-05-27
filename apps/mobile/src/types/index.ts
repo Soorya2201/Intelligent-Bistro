@@ -13,11 +13,21 @@ export interface MenuItem {
   popular?: boolean;
 }
 
-export interface CartItem {
+export interface CartLineCustomization {
+  groupId: string;
+  selectedOptionIds: string[];
+}
+
+export interface CartLine {
+  lineId: string;
   menuItem: MenuItem;
   quantity: number;
+  customizations: CartLineCustomization[];
+  customizationPriceDelta: number;
   specialInstructions?: string;
 }
+
+export type CartItem = CartLine;
 
 export interface Cart {
   items: CartItem[];

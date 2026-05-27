@@ -146,11 +146,12 @@ export default function CheckoutScreen() {
       const result = await placeOrder({
         sessionId: SESSION_ID,
         items: snapshot.map(c => ({
-          item_id:  c.menuItem.id,
-          name:     c.menuItem.name,
-          quantity: c.quantity,
-          price:    c.menuItem.price,
-          notes:    c.specialInstructions,
+          item_id:      c.menuItem.id,
+          name:         c.menuItem.name,
+          quantity:     c.quantity,
+          price:        c.menuItem.price + (c.customizationPriceDelta ?? 0),
+          notes:        c.specialInstructions,
+          customizations: c.customizations?.length ? c.customizations : undefined,
         })),
         subtotal,
         tax,

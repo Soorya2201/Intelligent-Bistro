@@ -1,6 +1,7 @@
 import {
   AddItemSchema, RemoveItemSchema, UpdateQuantitySchema,
-  ClarifySchema, SuggestPairingSchema, ClearCartSchema, UpsellSchema,
+  ClarifySchema, SuggestPairingSchema, ClearCartSchema, UpsellSchema, UpdateNotesSchema,
+  AskCustomizationSchema,
   BISTRO_TOOLS, validateToolInput,
 } from '../ai/tools';
 
@@ -153,9 +154,48 @@ describe('UpsellSchema', () => {
   });
 });
 
+describe('UpdateNotesSchema', () => {
+  it('accepts valid item_id and notes', () => {
+    const result = UpdateNotesSchema.safeParse({ item_id: 'truffle-fries', notes: 'extra crispy' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects missing item_id', () => {
+    const result = UpdateNotesSchema.safeParse({ notes: 'extra crispy' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects missing notes', () => {
+    const result = UpdateNotesSchema.safeParse({ item_id: 'truffle-fries' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('AskCustomizationSchema', () => {
+  it('accepts item_id and prompt', () => {
+    const result = AskCustomizationSchema.safeParse({ item_id: 'classic-bistro-burger', prompt: 'How would you like your burger?' });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts optional line_id', () => {
+    const result = AskCustomizationSchema.safeParse({ item_id: 'truffle-fries', prompt: 'Sauce?', line_id: 'line-123' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects prompt > 120 chars', () => {
+    const result = AskCustomizationSchema.safeParse({ item_id: 'x', prompt: 'p'.repeat(121) });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects missing item_id', () => {
+    const result = AskCustomizationSchema.safeParse({ prompt: 'test' });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe('BISTRO_TOOLS', () => {
-  it('exports 7 tools', () => {
-    expect(BISTRO_TOOLS.length).toBe(7);
+  it('exports 9 tools', () => {
+    expect(BISTRO_TOOLS.length).toBe(9);
   });
 
   it('every tool has name, description, and input_schema', () => {
@@ -175,6 +215,8 @@ describe('BISTRO_TOOLS', () => {
     expect(names).toContain('suggest_pairing');
     expect(names).toContain('clear_cart');
     expect(names).toContain('upsell');
+    expect(names).toContain('update_notes');
+    expect(names).toContain('ask_customization');
   });
 
   it('each input_schema has a type field', () => {

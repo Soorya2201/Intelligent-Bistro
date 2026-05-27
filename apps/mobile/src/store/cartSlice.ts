@@ -1,9 +1,23 @@
 import { StateCreator } from 'zustand';
-import { CartItem, MenuItem } from '../types';
+import { CartItem, CartLine, CartLineCustomization, MenuItem } from '../types';
+import { getDefaultCustomizations, calculatePriceDelta } from '../utils/customizations';
+
+let _lineCounter = 0;
+function newLineId(): string {
+  return `line-${Date.now()}-${++_lineCounter}`;
+}
 
 export interface CartSlice {
   items: CartItem[];
   isAnimating: boolean;
+
+  // ── New per-line API ───────────────────────────────────────────────────────
+  addLine: (menuItem: MenuItem, customizations?: CartLineCustomization[], notes?: string) => string;
+  removeLine: (lineId: string) => void;
+  updateLineCustomizations: (lineId: string, customizations: CartLineCustomization[]) => void;
+  getLinesByMenuItem: (menuItemId: string) => CartLine[];
+
+  // ── Legacy adapters (backward-compatible) ─────────────────────────────────
   addItem: (menuItem: MenuItem, qty: number, notes?: string) => void;
   removeItem: (menuItemId: string) => void;
   updateQuantity: (menuItemId: string, qty: number) => void;
@@ -13,49 +27,121 @@ export interface CartSlice {
   getItemCount: () => number;
 }
 
+function buildLine(
+  menuItem: MenuItem,
+  qty: number,
+  customizations: CartLineCustomization[],
+  notes?: string,
+): CartItem {
+  const delta = calculatePriceDelta(menuItem.id, customizations);
+  return {
+    lineId: newLineId(),
+    menuItem,
+    quantity: qty,
+    customizations,
+    customizationPriceDelta: delta,
+    specialInstructions: notes,
+  };
+}
+
+function sameCustomizations(a: CartLineCustomization[], b: CartLineCustomization[]): boolean {
+  if (a.length !== b.length) return false;
+  for (const aEntry of a) {
+    const bEntry = b.find(x => x.groupId === aEntry.groupId);
+    if (!bEntry) return false;
+    if ([...aEntry.selectedOptionIds].sort().join(',') !== [...bEntry.selectedOptionIds].sort().join(',')) return false;
+  }
+  return true;
+}
+
 export const createCartSlice: StateCreator<CartSlice, [], [], CartSlice> = (set, get) => ({
   items: [],
   isAnimating: false,
+
+  addLine: (menuItem, customizations, notes) => {
+    const customs = customizations ?? getDefaultCustomizations(menuItem.id);
+    const line    = buildLine(menuItem, 1, customs, notes);
+    set(state => ({ items: [...state.items, line], isAnimating: true }));
+    setTimeout(() => set({ isAnimating: false }), 600);
+    return line.lineId;
+  },
+
+  removeLine: (lineId) => {
+    set(state => ({ items: state.items.filter(i => i.lineId !== lineId), isAnimating: true }));
+    setTimeout(() => set({ isAnimating: false }), 600);
+  },
+
+  updateLineCustomizations: (lineId, customizations) => {
+    set(state => ({
+      items: state.items.map(i => {
+        if (i.lineId !== lineId) return i;
+        return {
+          ...i,
+          customizations,
+          customizationPriceDelta: calculatePriceDelta(i.menuItem.id, customizations),
+        };
+      }),
+    }));
+  },
+
+  getLinesByMenuItem: (menuItemId) => get().items.filter(i => i.menuItem.id === menuItemId),
+
+  // ── Legacy: merge by menuItemId + same customizations ────────────────────
+
   addItem: (menuItem, qty, notes) => {
-    set((state) => {
-      const existing = state.items.find(i => i.menuItem.id === menuItem.id);
-      let newItems;
+    set(state => {
+      const defaults = getDefaultCustomizations(menuItem.id);
+      const existing = state.items.find(
+        i => i.menuItem.id === menuItem.id && sameCustomizations(i.customizations, defaults)
+      );
       if (existing) {
-        newItems = state.items.map(i =>
-          i.menuItem.id === menuItem.id
-            ? { ...i, quantity: i.quantity + qty, ...(notes !== undefined && { specialInstructions: notes }) }
-            : i
-        );
-      } else {
-        newItems = [...state.items, { menuItem, quantity: qty, specialInstructions: notes }];
+        return {
+          items: state.items.map(i =>
+            i.lineId === existing.lineId
+              ? { ...i, quantity: i.quantity + qty, ...(notes !== undefined && { specialInstructions: notes }) }
+              : i
+          ),
+          isAnimating: true,
+        };
       }
-      return { items: newItems, isAnimating: true };
+      const line = buildLine(menuItem, qty, defaults, notes);
+      return { items: [...state.items, line], isAnimating: true };
     });
     setTimeout(() => set({ isAnimating: false }), 600);
   },
-  updateInstructions: (menuItemId, instructions) => {
-    set((state) => ({
-      items: state.items.map(i =>
-        i.menuItem.id === menuItemId ? { ...i, specialInstructions: instructions } : i
-      ),
-    }));
-  },
+
   removeItem: (menuItemId) => {
-    set((state) => ({ items: state.items.filter(i => i.menuItem.id !== menuItemId), isAnimating: true }));
+    set(state => ({ items: state.items.filter(i => i.menuItem.id !== menuItemId), isAnimating: true }));
     setTimeout(() => set({ isAnimating: false }), 600);
   },
+
   updateQuantity: (menuItemId, qty) => {
     if (qty <= 0) {
       get().removeItem(menuItemId);
       return;
     }
-    set((state) => ({
+    set(state => ({
       items: state.items.map(i => i.menuItem.id === menuItemId ? { ...i, quantity: qty } : i),
-      isAnimating: true
+      isAnimating: true,
     }));
     setTimeout(() => set({ isAnimating: false }), 600);
   },
+
+  updateInstructions: (menuItemId, instructions) => {
+    set(state => ({
+      items: state.items.map(i =>
+        i.menuItem.id === menuItemId ? { ...i, specialInstructions: instructions } : i
+      ),
+    }));
+  },
+
   clearCart: () => set({ items: [] }),
-  getTotal: () => get().items.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0),
-  getItemCount: () => get().items.reduce((sum, item) => sum + item.quantity, 0)
+
+  getTotal: () =>
+    get().items.reduce(
+      (sum, item) => sum + (item.menuItem.price + item.customizationPriceDelta) * item.quantity,
+      0,
+    ),
+
+  getItemCount: () => get().items.reduce((sum, item) => sum + item.quantity, 0),
 });

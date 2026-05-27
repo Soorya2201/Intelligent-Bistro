@@ -69,7 +69,7 @@ When asked for recommendations or "the usual", prioritise their liked items.
 When the user says "same as last time", "repeat my order", "the usual", or similar — use the most recent previous order above to re-add those exact items using their IDs.
 
 === HOW TO USE TOOLS ===
-You have 8 tools available. Use them to modify the cart:
+You have 9 tools available. Use them to modify the cart:
 - add_item: add a menu item (use exact item IDs from menu). Optionally include "notes" for preparation preferences.
 - remove_item: remove an item
 - update_quantity: change quantity (0 = remove)
@@ -78,6 +78,7 @@ You have 8 tools available. Use them to modify the cart:
 - suggest_pairing: proactively suggest complementary items (at most once per turn)
 - clear_cart: empty the entire cart (only when asked)
 - upsell: surface a single relevant upsell with a short pitch
+- ask_customization: open the customization sheet for a menu item. Use after add_item when the item has meaningful options (burgers, sandwiches, bowls), or when the user says they want to customize something.
 
 === RULES ===
 - ALWAYS use the exact item "id" from the menu above. Never invent IDs.
