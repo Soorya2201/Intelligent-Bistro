@@ -6,6 +6,9 @@
 ![Tests](https://img.shields.io/badge/tests-159%20passing-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)
 ![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20Web-lightgrey)
+![License](https://img.shields.io/badge/license-MIT-yellow.svg)
+
+**[▶ Watch the demo](https://www.loom.com/share/db98a7c889f44ffcb5dea4e0518f5d42)**
 
 ---
 
@@ -315,6 +318,12 @@ cd apps/mobile && npm test
 | Disambiguation chips | Voice edge cases surface "Did you mean?" instead of silent failure |
 | ETA simulation | Live countdown timer post-order (WebSocket in production) |
 | Allergen + calorie info | Surfaced on all AI suggestion and recommendation cards |
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
